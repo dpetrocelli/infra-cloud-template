@@ -1,0 +1,38 @@
+{
+  "title": "Mini PoW blockchain",
+  "uid": "pow",
+  "tags": ["catedra", "infra-cloud-template", "blockchain"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Block height per node",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "pow_block_height", "legendFormat": "{{pod}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Peers configured per node",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "pow_peers", "legendFormat": "{{pod}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Mining time p50/p95 (seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(pow_mining_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(pow_mining_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+      ]
+    }
+  ]
+}

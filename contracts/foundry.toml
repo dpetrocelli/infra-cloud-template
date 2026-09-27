@@ -1,0 +1,9 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+solc_version = "0.8.24"
+
+# Class 4 (BC): this is the config `forge test` reads in CI (contracts.yml).
+# Class 7 (BC): deploy to Base Sepolia uses the same contract, no code change.

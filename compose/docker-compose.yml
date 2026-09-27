@@ -1,0 +1,19 @@
+# Class 3 (Docker + Artifact Registry) and class 5-6 baseline: just the
+# servicio patron, with its state on a named volume (stand-in for the
+# persistent disk used in classes 1-2 on a real VM).
+services:
+  servicio-patron:
+    build:
+      context: ../app
+    image: servicio-patron:local
+    ports:
+      - "8080:8080"
+    environment:
+      DATA_DIR: /data
+      PORT: "8080"
+    volumes:
+      - servicio-patron-data:/data
+    restart: unless-stopped
+
+volumes:
+  servicio-patron-data:

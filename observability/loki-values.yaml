@@ -1,0 +1,30 @@
+# Class 6: minimal values for the `loki` Helm chart (grafana/loki), single
+# binary mode -- no object storage cluster needed for a classroom setup.
+#   helm repo add grafana https://grafana.github.io/helm-charts
+#   helm install loki grafana/loki -f loki-values.yaml
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# Promtail/Grafana Agent (deployed separately) tails pod logs and ships
+# them here; Grafana's Loki datasource is auto-provisioned by the
+# kube-prometheus-stack Grafana sidecar in this same namespace.

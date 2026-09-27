@@ -1,0 +1,38 @@
+# Class 6 (Observability: Cloud Monitoring, Prometheus, Grafana, Loki).
+# Minimal values.yaml for the `kube-prometheus-stack` Helm chart
+# (prometheus-community/kube-prometheus-stack), sized for a classroom GKE
+# cluster. Install with:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install kube-prom prometheus-community/kube-prometheus-stack -f kube-prometheus-stack-values.yaml
+
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    # Only scrape ServiceMonitors we explicitly label, to keep this small.
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  adminPassword: "" # set via --set grafana.adminPassword=... at install time, never commit it
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Pre-load the class dashboards from observability/dashboards/*.json via a
+  # sidecar that watches ConfigMaps labeled grafana_dashboard=1.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+
+alertmanager:
+  enabled: false # keep the classroom stack simple; alerting is out of scope

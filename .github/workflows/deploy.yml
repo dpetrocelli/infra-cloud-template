@@ -1,0 +1,95 @@
+# Class 8 (caso integrador): applies Terraform and rolls out the Helm
+# charts. Runs against the "production" GitHub Environment, which you
+# configure with a required reviewer -- that reviewer's manual approval is
+# the "manual approval env" the brief asks for; nothing here auto-applies.
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Terraform env (dev or prod)"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.env }} # manual-approval gate lives here
+    defaults:
+      run:
+        working-directory: terraform/envs/${{ github.event.inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: terraform init
+        run: terraform init -backend-config="bucket=${{ vars.GCP_PROJECT_ID }}-tfstate"
+
+      - name: terraform plan
+        run: |
+          terraform plan -out=tfplan \
+            -var="project_id=${{ vars.GCP_PROJECT_ID }}" \
+            -var="region=${{ vars.GCP_REGION }}" \
+            -var="zone=${{ vars.GCP_ZONE }}" \
+            -var="servicio_patron_image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/app:latest"
+
+      - name: terraform apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials infra-cloud-${{ github.event.inputs.env }}-gke \
+            --zone "${{ vars.GCP_ZONE }}" --project "${{ vars.GCP_PROJECT_ID }}"
+
+  helm:
+    needs: terraform
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: azure/setup-helm@v4
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials infra-cloud-${{ github.event.inputs.env }}-gke \
+            --zone "${{ vars.GCP_ZONE }}" --project "${{ vars.GCP_PROJECT_ID }}"
+
+      - name: helm upgrade servicio-patron
+        run: |
+          helm upgrade --install servicio-patron helm/charts/servicio-patron \
+            --set image.repository=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/app \
+            --set image.tag=latest
+
+      - name: helm upgrade model
+        run: |
+          helm upgrade --install model helm/charts/model \
+            --set image.repository=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/model \
+            --set image.tag=latest
+
+      - name: helm upgrade pow
+        run: |
+          helm upgrade --install pow helm/charts/pow \
+            --set image.repository=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/pow \
+            --set image.tag=latest

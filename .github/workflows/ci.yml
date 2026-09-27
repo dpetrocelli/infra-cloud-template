@@ -1,0 +1,95 @@
+# Class 4 (CI/CD with GitHub Actions and OIDC). Runs on every push/PR:
+#   1) pytest for app/, model/, pow/
+#   2) docker build for each service
+#   3) on main only: push to Artifact Registry, authenticated via Workload
+#      Identity Federation (OIDC) -- no JSON service-account key anywhere.
+#
+# Configure these as REPOSITORY VARIABLES (Settings > Secrets and variables >
+# Actions > Variables), never as hardcoded values or as secrets holding a key:
+#   GCP_PROJECT_ID              e.g. "my-gcp-project"
+#   GCP_REGION                  e.g. "us-central1"
+#   GCP_WORKLOAD_IDENTITY_PROVIDER   full WIF provider resource name
+#   GCP_SERVICE_ACCOUNT         e.g. "ci-deployer@my-gcp-project.iam.gserviceaccount.com"
+#   AR_REPOSITORY                e.g. "infra-cloud-template"
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC / Workload Identity Federation
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [app, model, pow]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+
+      - name: Run tests for ${{ matrix.service }}
+        working-directory: ${{ matrix.service }}
+        run: uv run --python 3.12 --with-requirements requirements.txt --with pytest --with httpx pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [app, model, pow]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }} image
+        run: docker build -t ${{ matrix.service }}:${{ github.sha }} ./${{ matrix.service }}
+
+      - name: Smoke test container
+        run: |
+          port=8080
+          case "${{ matrix.service }}" in
+            model) port=8081 ;;
+            pow) port=8090 ;;
+          esac
+          docker run -d --name smoke -p $port:$port ${{ matrix.service }}:${{ github.sha }}
+          sleep 5
+          curl -sf http://localhost:$port/healthz
+          docker rm -f smoke
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [app, model, pow]
+    steps:
+      - uses: actions/checkout@v4
+
+      # OIDC auth: GitHub issues a short-lived token, GCP trusts it via the
+      # Workload Identity Pool/Provider. No downloaded JSON key involved.
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build and push ${{ matrix.service }}
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/${{ matrix.service }}
+        run: |
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" ./${{ matrix.service }}
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"

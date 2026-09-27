@@ -1,0 +1,39 @@
+# Blockchain example: Anvil (Foundry's local dev chain) plus the servicio patron,
+# used from class 3 onward as the "stack de desarrollo blockchain" artifact.
+# Anvil's --state flag combines --load-state + --dump-state: it loads the
+# saved chain state on boot and keeps dumping it to the same file, so the
+# container is disposable and the volume is the source of truth (same
+# lesson as class 1's persistent-disk demo).
+services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: ["anvil"]
+    command:
+      - "--host"
+      - "0.0.0.0"
+      - "--state"
+      - "/state/anvil-state.json"
+    ports:
+      - "8545:8545"
+    volumes:
+      - anvil-state:/state
+    restart: unless-stopped
+
+  servicio-patron:
+    build:
+      context: ../app
+    image: servicio-patron:local
+    ports:
+      - "8080:8080"
+    environment:
+      DATA_DIR: /data
+      PORT: "8080"
+    volumes:
+      - servicio-patron-data:/data
+    depends_on:
+      - anvil
+    restart: unless-stopped
+
+volumes:
+  anvil-state:
+  servicio-patron-data:

@@ -1,0 +1,19 @@
+image:
+  repository: ghcr.io/foundry-rs/foundry
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8545
+
+persistence:
+  size: 1Gi
+  storageClassName: standard
+
+exporter:
+  enabled: true
+  image:
+    repository: anvil-exporter
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 9090

@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY exporter.py .
+
+EXPOSE 9090
+ENV RPC_URL=http://localhost:8545 PORT=9090
+
+CMD ["python", "exporter.py"]

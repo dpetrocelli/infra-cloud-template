@@ -1,0 +1,29 @@
+image:
+  repository: pow
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+service:
+  port: 8090
+
+persistence:
+  size: 512Mi
+  storageClassName: standard
+
+difficulty: 4
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
