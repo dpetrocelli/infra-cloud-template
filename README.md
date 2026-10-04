@@ -3,10 +3,9 @@
 Repo template de la cátedra (2026). Trae el **servicio patrón** y todo lo que
 hace falta para llevarlo de tu laptop a producción a lo largo de las 8 clases:
 contenedores, IaC, CI/CD, Kubernetes y observabilidad. Cada estudiante lo
-instancia y le suma su propio artefacto. Hay dos pistas de ejemplo: **IA**
-(servidor de inferencia) y **BC** (Blockchain: Anvil, contratos y la **línea
-base** de una mini-blockchain PoW, de un solo nodo, que extendés en tu Trabajo
-Final).
+instancia y le suma su propio artefacto. Además del servicio patrón (`app/`),
+trae cargas de ejemplo opcionales (`model/`, `pow/`, `contracts/`): usá solo
+las que pida la consigna de tu aula.
 
 No hace falta entender todo el repo el día 1: cada clase usa una carpeta
 puntual. Arrancá por la sección "Primeros 10 minutos" y después seguí la guía
@@ -87,31 +86,30 @@ Para bajarlo: `make compose-down` (conserva los datos) o `make compose-reset`
 |---|---|---|---|
 | 1 | Arquitectura híbrida y cargas stateful sobre Compute Engine | [docs/clase-01.md](docs/clase-01.md) | `app/` en tu laptop y en una VM, con el estado en un disco aparte |
 | 2 | IaC con OpenTofu/Terraform sobre GCP | [docs/clase-02.md](docs/clase-02.md) | `terraform/modules/{network,vm,artifact-registry}`, `terraform/envs/dev` |
-| 3 | Contenedores con Docker y Artifact Registry | [docs/clase-03.md](docs/clase-03.md) | los `Dockerfile`, `compose/`, el registry `infra-cloud-template` |
-| 4 | CI/CD con GitHub Actions y OIDC | [docs/clase-04.md](docs/clase-04.md) | `.github/workflows/ci.yml` (IA y BC) y `contracts.yml` (BC) |
-| 5 | Kubernetes: Helm, PV y StatefulSets | [docs/clase-05.md](docs/clase-05.md) | `helm/charts/*` con `values-k3s.yaml` (local) y `terraform/modules/gke` |
-| 6 | Observabilidad: Prometheus, Grafana y Loki | [docs/clase-06.md](docs/clase-06.md) | `observability/` completo |
-| 7 | IA: Vertex AI, Ollama, vast.ai · BC: Layer 2 (Base Sepolia) | [docs/clase-07.md](docs/clase-07.md) | `model/` (IA) · `contracts/` + `contracts.yml` (BC) |
-| 8 | Caso integrador: de git push a producción | [docs/clase-08.md](docs/clase-08.md) | todo el repo, orquestado por `deploy.yml` |
+| 3 | Contenedores con Docker y Artifact Registry | [docs/clase-03.md](docs/clase-03.md) · pista: [BC](docs/bc/clase-03.md) / [IA](docs/ia/clase-03.md) | los `Dockerfile`, `compose/`, el registry `infra-cloud-template` |
+| 4 | CI/CD con GitHub Actions y OIDC | [docs/clase-04.md](docs/clase-04.md) | `.github/workflows/ci.yml` (test, build, publish con OIDC) y `contracts.yml` (forge fmt + forge test; deploy a testnet con un tag) |
+| 5 | Kubernetes: Helm, PV y StatefulSets | [docs/clase-05.md](docs/clase-05.md) · pista: [BC](docs/bc/clase-05.md) / [IA](docs/ia/clase-05.md) | `helm/charts/*` con `values-k3s.yaml` (local) y `terraform/modules/gke` |
+| 6 | Observabilidad: Prometheus, Grafana y Loki | [docs/clase-06.md](docs/clase-06.md) · pista: [BC](docs/bc/clase-06.md) / [IA](docs/ia/clase-06.md) | `observability/` completo |
+| 7 | Del artefacto local a la nube: medir y comparar | [docs/clase-07.md](docs/clase-07.md) | la carga de ejemplo que pida tu aula |
+| 8 | Caso integrador: de git push a producción | [docs/clase-08.md](docs/clase-08.md) · pista: [BC](docs/bc/clase-08.md) / [IA](docs/ia/clase-08.md) | todo el repo, orquestado por `deploy.yml` |
 
 Cada guía tiene la misma estructura: objetivo, prerrequisitos, pasos
-numerados con la salida esperada, la pista BC y la pista IA, un recuadro "En
-la nube", limpieza y una tabla de errores frecuentes.
+numerados con la salida esperada, un recuadro "En la nube", limpieza y una
+tabla de errores frecuentes. Lo propio de cada diplomatura está en la guía de
+su pista (`docs/bc/` o `docs/ia/`): seguí solo la que te indica tu aula.
 
 ## ¿Qué hay acá adentro?
 
 ```
 app/                 servicio patrón (FastAPI): GET /, /healthz, /metrics,
                      POST /items y GET /items. Estado en /data.
-model/               (IA) servidor de inferencia: POST /predict. El modelo
-                     (iris) se entrena al construir la imagen.
-pow/                 (BC) LÍNEA BASE de un nodo PoW (corre como un nodo):
+model/               servidor de inferencia de ejemplo: POST /predict (modelo
+                     Iris entrenado al construir la imagen).
+pow/                 nodo de ejemplo de una cadena PoW (un solo nodo):
                      /healthz /metrics /chain /tx /mine, dificultad fija,
-                     cadena en /data. Lo que falta (peers, /peers/sync,
-                     validar cadenas, consenso, dificultad ajustable, reglas
-                     del mempool, concurrencia) está marcado TODO(TF): es tu
-                     Trabajo Final.
-contracts/           (BC) proyecto Foundry: contrato Counter + tests.
+                     cadena en /data. Ver pow/README.md.
+contracts/           proyecto Foundry de ejemplo: contrato Counter + tests.
+                     Ver contracts/README.md.
 compose/             docker-compose.yml (servicio patrón) y
                      docker-compose.anvil.yml (Anvil + servicio patrón).
 terraform/           módulos (network, vm, artifact-registry, gke) y
@@ -123,7 +121,7 @@ observability/       valores de kube-prometheus-stack y Loki, config de
 .github/workflows/   ci.yml, contracts.yml y deploy.yml (OIDC, sin claves).
 loadtest/            script de k6 y un Job para correrlo dentro del cluster.
 scripts/             doctor.sh (make doctor) y compute-tags.sh (tags de CI).
-docs/                una guía por clase.
+docs/                una guía por clase, y la de cada pista en docs/bc y docs/ia.
 ```
 
 ## Nombres, puertos y tags (una sola tabla para todo el curso)
@@ -131,9 +129,9 @@ docs/                una guía por clase.
 | Servicio | Carpeta | Puerto | Imagen local | Imagen en Artifact Registry | Release de Helm |
 |---|---|---|---|---|---|
 | Servicio patrón | `app/` | 8080 | `app:local` | `$AR/app` | `servicio-patron` |
-| Modelo (IA) | `model/` | 8081 | `model:local` | `$AR/model` | `model` |
-| Nodo PoW (BC) | `pow/` | 8090 | `pow:local` | `$AR/pow` | `pow` |
-| Anvil (BC) | imagen de Foundry | 8545 | `ghcr.io/foundry-rs/foundry:stable` | (no se publica) | `anvil` |
+| Modelo | `model/` | 8081 | `model:local` | `$AR/model` | `model` |
+| Nodo PoW | `pow/` | 8090 | `pow:local` | `$AR/pow` | `pow` |
+| Anvil | imagen de Foundry | 8545 | `ghcr.io/foundry-rs/foundry:stable` | (no se publica) | `anvil` |
 | Exporter de Anvil | `observability/anvil-exporter/` | 9090 | `anvil-exporter:local` | (no se publica) | sidecar del chart `anvil` |
 
 Con estas variables (poné **tus** valores, entre comillas):
@@ -156,24 +154,6 @@ Tags de las imágenes:
 
 Instalá los charts con el **nombre de release** de la tabla: los nombres DNS,
 los dashboards y las guías asumen esos nombres.
-
-## BC: la línea base PoW es el punto de partida de tu TF
-
-El Trabajo Final de BC es **tu propia blockchain PoW con varios nodos, en
-producción en la nube**. `pow/` y `helm/charts/pow` no son esa blockchain:
-son la línea base de la que partís.
-
-| Ya está (no lo tenés que escribir) | Es tu TF (marcado `TODO(TF)` en el código) |
-|---|---|
-| `Block`, hash sha256, bloque génesis | dificultad ajustable |
-| cadena en JSON en `/data` (sobrevive al pod) | validar una cadena que llega de otro nodo |
-| `POST /mine` con un loop de dificultad fija | peers: `GET /peers` y `POST /peers/sync` |
-| `/healthz`, `/metrics` (`pow_block_height`), `/chain`, `/tx` en el puerto 8090 | consenso: la cadena más larga y válida gana |
-| chart con StatefulSet, un PVC por nodo, Service headless y `PEERS` | reglas del mempool y seguridad ante concurrencia |
-
-Los tests de `pow/tests/` que están en `skip` son la pista: cuando implementes
-cada parte, sacales el `skip`. Con `replicaCount: 3` hoy tenés tres cadenas
-**independientes**; que converjan es tu trabajo (al menos 2 nodos sincronizando).
 
 ## Comandos útiles
 
@@ -215,7 +195,7 @@ make k3d-up && make k3d-images   # cluster local con las imágenes adentro
 | `curl: (56) Recv failure: Connection reset by peer` | El servicio todavía arranca: esperá 2 segundos o usá `--wait` en compose. |
 | `uv: command not found` / `forge: not found` | `make doctor` te dice qué instalar; `make test-contracts` usa Docker si no hay forge. |
 | `Backend initialization required` | [clase 2](docs/clase-02.md#errores-frecuentes): el chequeo offline es `init -backend=false` + `validate`, no `plan`. |
-| El saldo de Anvil volvió a 10000 ETH | [clase 3](docs/clase-03.md#errores-frecuentes): el volumen de estado no era escribible. |
+| El saldo de Anvil volvió a 10000 ETH | [clase 3, pista BC](docs/bc/clase-03.md#errores-frecuentes): el volumen de estado no era escribible. |
 | Pods en `Pending` | [clase 5](docs/clase-05.md#errores-frecuentes): StorageClass o disco casi lleno. |
 | `ErrImageNeverPull` / `ErrImagePull` | [clase 5](docs/clase-05.md#errores-frecuentes): falta `make k3d-images` o el `image.repository`. |
 | `publish` aparece gris (skipped) en Actions | [clase 4](docs/clase-04.md#errores-frecuentes): es lo esperado hasta cargar las variables. |
@@ -229,9 +209,10 @@ make k3d-up && make k3d-images   # cluster local con las imágenes adentro
   `Dockerfile` de cada servicio.
 - Ningún archivo contiene credenciales. Lo que necesita CI/CD (project id,
   proveedor de Workload Identity, cuenta de servicio) es una **variable de
-  repositorio** de GitHub; la clave de deploy de testnet (BC) es un *secret*
+  repositorio** de GitHub; la clave de deploy de testnet es un *secret*
   de un environment.
 
-## Docente
+## Equipo docente
 
-Dr. David Marcelo Petrocelli · dmpetrocelli@gmail.com
+- Dr. David Marcelo Petrocelli · dmpetrocelli@gmail.com
+- Mauricio Romero
