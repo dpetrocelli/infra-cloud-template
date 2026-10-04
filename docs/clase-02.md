@@ -11,7 +11,8 @@ Al terminar tenés:
 1. `terraform/envs/dev` validado sin nube (offline).
 2. Un `plan` y un `apply` reales de la red, el registry y la VM, con el estado en GCS.
 3. Un ejemplo de *drift* detectado por `plan`.
-4. Tu variante para tu área (BC: Anvil; IA: tu servidor de inferencia).
+4. Tu artefacto: el mismo módulo `vm` instanciado en un entorno nuevo, con otras
+   variables (la receta está en el lab de tu aula, Parte 4).
 
 Todo funciona igual con `tofu` (OpenTofu) o `terraform`: donde dice `tofu`,
 podés escribir `terraform`.
@@ -142,56 +143,44 @@ Esperado, al final: `Plan: 8 to add, 0 to change, 0 to destroy.` (red, subred,
 > Artifact Registry, dásela:
 > `gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com" --role=roles/artifactregistry.reader`.
 
-## Pista BC: Anvil en la VM con el mismo módulo
+## Tu artefacto en la VM
 
-Copiá `envs/dev` **cambiando los nombres** (si no, compartís el estado de dev
-y el plan te ofrece destruir tu VM de dev):
+Para correr otra carga con el mismo módulo, copiá `envs/dev` a un entorno
+nuevo **cambiando los nombres** (si no, compartís el estado de dev y el plan te
+ofrece destruir tu VM de dev). Desde la raíz del repo, con los valores de tu
+carga en las dos primeras líneas:
 
 ```bash
-cp -r terraform/envs/dev terraform/envs/anvil
-cd terraform/envs/anvil
-sed -i 's#infra-cloud-template/dev#infra-cloud-template/anvil#' backend.tf
-sed -i 's#"infra-cloud-dev"#"infra-cloud-anvil"#' main.tf
+NOMBRE="mi-carga"     # el nombre del entorno: minúsculas, sin espacios
+PUERTO="8080"         # el puerto en el que escucha tu carga
+cp -r terraform/envs/dev "terraform/envs/$NOMBRE"
+cd "terraform/envs/$NOMBRE"
+rm -rf .terraform .terraform.lock.hcl dev.plan     # lo que trajo la copia de dev
+mv dev.tfvars "$NOMBRE.tfvars"
+sed -i "s#infra-cloud-template/dev#infra-cloud-template/$NOMBRE#" backend.tf
+sed -i "s#\"infra-cloud-dev\"#\"infra-cloud-$NOMBRE\"#" main.tf
+printf 'enable_artifact_registry = false\napp_port                 = %s\n' "$PUERTO" >> "$NOMBRE.tfvars"
+tofu init -backend-config=backend.hcl
 ```
 
 (En macOS el `sed` nativo pide `sed -i ''`; en WSL/Linux va como está.)
 
-En `main.tf` de la copia, dejá el registry apagado (ya existe) y pasale a la VM
-la configuración de Anvil:
+- `enable_artifact_registry = false`: el registry ya lo creó dev; crearlo dos
+  veces falla con `409 already exists`.
+- Si tu carga es una imagen propia, subila y poné ese valor en
+  `servicio_patron_image` de `$NOMBRE.tfvars`:
+  `gcloud builds submit <carpeta> --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/infra-cloud-template/<imagen>:v1"`.
+- Los valores propios de tu carga (imagen, argumentos del contenedor, uid del
+  disco, puerto) están en el lab de tu aula.
+- El módulo `vm` corre el contenedor con `--restart unless-stopped`: un proceso
+  que termina (un job batch, un script que procesa y sale) vuelve a arrancar y se repite en
+  loop. Para esta clase usá un servicio que quede escuchando en su puerto.
+- El puerto queda abierto a internet. Para una demo alcanza; para algo más,
+  acotalo con `app_source_ranges = ["<tu-ip>/32"]` en el tfvars o usá un túnel
+  (`gcloud compute ssh ... -- -L <puerto>:localhost:<puerto>`).
 
-```hcl
-module "vm" {
-  source = "../../modules/vm"
-  count  = var.enable_vm ? 1 : 0
-
-  name                 = "${local.name_prefix}-vm"
-  zone                 = var.zone
-  environment          = "dev"
-  subnetwork_id        = module.network.subnetwork_id
-  container_name       = "anvil"
-  container_image      = "ghcr.io/foundry-rs/foundry:stable"
-  container_entrypoint = "anvil"
-  container_args       = ["--host", "0.0.0.0", "--state", "/data/anvil-state.json", "--state-interval", "5"]
-  data_uid             = 1000 # Anvil corre como uid 1000: el disco tiene que ser suyo
-  app_port             = 8545
-}
-```
-
-y en `dev.tfvars` de la copia: `enable_artifact_registry = false` y
-`app_port = 8545`. Ojo: el puerto 8545 queda abierto a internet; para una demo
-alcanza, para algo más usá un túnel (`gcloud compute ssh ... -- -L 8545:localhost:8545`).
-
-## Pista IA: tu servidor de inferencia en la VM
-
-Mismo procedimiento de copia (`envs/ia-artefacto`, prefijo `infra-cloud-ia`),
-con `container_image = "<tu imagen en $AR>"` y `app_port = 8081` si usás
-`model/`. Si vas por GPU, el módulo no alcanza tal cual: hace falta
-`guest_accelerator`, `scheduling { on_host_maintenance = "TERMINATE" }`, una
-imagen con drivers NVIDIA y `docker run --gpus all`. Por defecto quedate en CPU.
-
-Para un estado local (sin bucket) en la copia: **borrá `backend.tf`** y corré
-`tofu init` (sin `-backend=false`). Sin bloque backend, el estado queda en
-`terraform.tfstate` en esa carpeta (y está en `.gitignore`).
+Después, `tofu plan -var-file="$NOMBRE.tfvars"` y `tofu apply -var-file="$NOMBRE.tfvars"`.
+Al terminar, `tofu destroy -var-file="$NOMBRE.tfvars"` en esa carpeta.
 
 ## Limpieza
 
@@ -205,6 +194,7 @@ make clean                                                      # borra los .ter
 
 | Si ves | Causa | Hacé |
 |---|---|---|
+| `Backend configuration changed` | Copiaste un env que ya estaba inicializado (trae su `.terraform/`) o cambiaste el `prefix` del backend | Borrá `.terraform/` de la copia o corré `tofu init -reconfigure -backend-config=backend.hcl`; nunca aceptes `-migrate-state` desde otro env (copia su estado y el plan propone reemplazar sus recursos) |
 | `Backend initialization required` | Hiciste `init -backend=false` y después `plan` | `init -backend=false` es solo para `validate`. Para planear: `tofu init -backend-config=backend.hcl` |
 | `could not find default credentials` | Falta el login de aplicación | `gcloud auth application-default login` |
 | `storage: bucket doesn't exist` | El bucket no existe o `backend.hcl` tiene otro nombre | Creá `gs://<proyecto>-tfstate` y revisá `backend.hcl` |

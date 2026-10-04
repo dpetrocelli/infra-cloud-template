@@ -30,7 +30,7 @@ Al terminar tenés:
 make test-app
 ```
 
-Esperado: `4 passed`.
+Esperado: `5 passed`.
 
 ### 2. Construí la imagen
 
@@ -63,7 +63,7 @@ Esperado: `{"status":"ok"}`.
 ```bash
 curl localhost:8080/
 curl localhost:8080/
-curl -s -X POST localhost:8080/items -H 'Content-Type: application/json' -d '{"name":"gpu","value":"t4"}'; echo
+curl -s -X POST localhost:8080/items -H 'Content-Type: application/json' -d '{"name":"demo","value":"1"}'; echo
 cat datos/counter.txt; echo
 curl -s localhost:8080/metrics | grep '^servicio_patron_hits_total'
 ```
@@ -73,7 +73,7 @@ Esperado:
 ```
 Servicio patron activo. Visitas persistidas en disco: 1
 Servicio patron activo. Visitas persistidas en disco: 2
-{"name":"gpu","value":"t4","created_at":...}
+{"name":"demo","value":"1","created_at":...}
 2
 servicio_patron_hits_total 2.0
 ```
@@ -89,7 +89,7 @@ curl localhost:8080/
 curl -s localhost:8080/items; echo
 ```
 
-Esperado: `Visitas persistidas en disco: 3` y el item `gpu` sigue ahí. El
+Esperado: `Visitas persistidas en disco: 3` y el item `demo` sigue ahí. El
 contenedor es nuevo, el estado no.
 
 Ojo: `servicio_patron_hits_total` en `/metrics` vuelve a empezar, porque esa
@@ -109,46 +109,13 @@ docker rm -f sin-disco
 Esperado: `Visitas persistidas en disco: 1`. Sin `-v`, `/data` vive adentro del
 contenedor y muere con él.
 
-## Pista BC: Anvil con estado en disco
-
-Anvil (la blockchain local de Foundry) guarda su estado con `--state`. Para que
-eso funcione de verdad hacen falta tres cosas (en la clase 3 las vas a ver
-resueltas en `compose/docker-compose.anvil.yml`):
-
-1. El directorio tiene que ser del uid 1000 (Anvil no corre como root).
-2. `--entrypoint anvil`, así Anvil recibe la señal de stop y guarda al salir.
-3. `--state-interval 5`, así también guarda cada 5 segundos (por si lo matan).
-
-```bash
-mkdir -p datos-anvil
-docker run -d --name anvil -p 8545:8545 -v "$PWD/datos-anvil:/state" \
-  --user "$(id -u):$(id -g)" --entrypoint anvil ghcr.io/foundry-rs/foundry:stable \
-  --host 0.0.0.0 --state /state/anvil-state.json --state-interval 5
-sleep 3
-docker exec anvil cast rpc evm_mine >/dev/null
-docker exec anvil cast block-number
-docker stop anvil && docker rm anvil     # stop (no rm -f): Anvil guarda al salir
-ls datos-anvil/                           # tiene que aparecer anvil-state.json
-```
-
-Volvé a correr el mismo `docker run` y `docker exec anvil cast block-number`
-tiene que seguir en `1`. Limpieza: `docker rm -f anvil && rm -r datos-anvil`.
-
-## Pista IA: inferencia con estado afuera
-
-El servidor de `model/` no tiene estado propio: los pesos viajan adentro de la
-imagen (clase 3 y 7). Lo que sí aplica hoy es la regla: **todo lo que tenga que
-sobrevivir (pesos descargados, caché de modelos, resultados) va a un disco
-montado**, no al filesystem del contenedor. Si en el lab usás Ollama, montá su
-directorio de modelos en el disco de datos (`-v /mnt/disks/datos/ollama:/root/.ollama`)
-y usá una VM **e2-medium** o más grande: `llama3.2:1b` ocupa alrededor de
-1,5 GB de RAM y en una e2-small (2 GB) no entra junto con el servicio patrón.
-
 > ### En la nube (Compute Engine)
 >
 > Lo mismo que hiciste en la laptop, con un disco persistente de GCP en lugar
-> de `./datos`. El lab de Moodle tiene la versión paso a paso con la consola;
-> estos son los comandos equivalentes.
+> de `./datos`. El Lab 3 de Moodle arma una versión mínima a mano, con gcloud y
+> con sus propios nombres (VM `servicio-patron`, disco `datos-servicio-patron`,
+> regla `allow-servicio-patron`); estos son los comandos para el servicio
+> patrón del template.
 >
 > ```bash
 > export PROJECT_ID="mi-proyecto-123" ZONE="southamerica-east1-a"
@@ -157,7 +124,7 @@ y usá una VM **e2-medium** o más grande: `llama3.2:1b` ocupa alrededor de
 > gcloud compute instances create vm-servicio-patron --zone="$ZONE" --machine-type=e2-small \
 >   --image-family=debian-12 --image-project=debian-cloud --tags=app-server \
 >   --disk=name=servicio-patron-datos,device-name=datos,mode=rw,boot=no
-> gcloud compute firewall-rules create allow-servicio-patron --allow=tcp:8080 --target-tags=app-server
+> gcloud compute firewall-rules create allow-app-server --allow=tcp:8080 --target-tags=app-server
 > gcloud compute ssh vm-servicio-patron --zone="$ZONE"
 > ```
 >
@@ -201,7 +168,8 @@ rm -r datos            # si te dice Permission denied: sudo rm -r datos
 
 En GCP: `gcloud compute instances delete vm-servicio-patron --zone="$ZONE"` y,
 cuando ya no lo necesites, `gcloud compute disks delete servicio-patron-datos --zone="$ZONE"`
-(el disco se cobra aunque no tenga VM).
+(el disco se cobra aunque no tenga VM), y la regla:
+`gcloud compute firewall-rules delete allow-app-server`.
 
 ## Errores frecuentes
 
@@ -216,4 +184,3 @@ cuando ya no lo necesites, `gcloud compute disks delete servicio-patron-datos --
 | El contador volvió a 1 | Te olvidaste el `-v` o lo montaste en otro path | Revisá `docker inspect servicio-patron --format '{{json .Mounts}}'` |
 | `Cannot connect to the Docker daemon` | Docker no corre | Abrí Docker Desktop o `sudo systemctl start docker` |
 | En la VM, `docker: command not found` | Todavía no instalaste Docker (o el startup script no terminó) | `curl -fsSL https://get.docker.com \| sudo sh` |
-| Anvil volvió al bloque 0 | El directorio no era del uid 1000, o usaste `docker rm -f` sin `--state-interval` | Seguí los tres puntos de la pista BC |
