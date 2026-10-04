@@ -17,7 +17,8 @@ Al terminar tenés:
 1. kube-prometheus-stack, Loki y Alloy instalados en el namespace `observability`.
 2. Los targets de tus servicios en `UP` y los dashboards del repo cargados.
 3. Una consulta LogQL que encuentra tus errores.
-4. BC: la altura de bloque de Anvil como métrica. IA: latencia y réplicas del modelo bajo carga.
+4. Las métricas de la carga de tu pista: [docs/bc/clase-06.md](bc/clase-06.md) o
+   [docs/ia/clase-06.md](ia/clase-06.md).
 
 ## Prerrequisitos
 
@@ -85,9 +86,9 @@ Entrá a `http://localhost:13000` con `admin` y tu `$GRAFANA_PASS`. Si no la
 pasaste al instalar, el chart generó una al azar:
 `kubectl -n observability get secret kube-prom-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo`.
 
-En **Dashboards** aparecen `Servicio patron`, `Model server`, `Mini PoW
-baseline` (solo la altura de bloque; los paneles de tu red los agregás en el
-TF) y `Anvil (BC dev chain)`. El del servicio patrón trae tres paneles (requests/s,
+En **Dashboards** aparecen los dashboards de `observability/dashboards/`: usá
+el del servicio patrón y el que corresponde a tu servicio (lo ves en la pista
+de tu diplomatura, punto 4 del objetivo). El del servicio patrón trae tres paneles (requests/s,
 items/s, latencia p95 por path). Generá tráfico para verlos moverse:
 
 ```bash
@@ -133,42 +134,6 @@ Para dispararla: `kubectl scale statefulset servicio-patron --replicas=0` (el
 HPA la vuelve a subir en unos minutos; para que no lo haga, primero
 `kubectl delete hpa servicio-patron`).
 
-## Pista BC: métricas de Anvil
-
-Anvil habla JSON-RPC, no Prometheus. `observability/anvil-exporter/` es un
-traductor de 40 líneas que publica `anvil_block_number`.
-
-```bash
-make k3d-images      # incluye anvil-exporter:local
-helm upgrade --install anvil helm/charts/anvil -f helm/charts/anvil/values-k3s.yaml \
-  --set exporter.enabled=true --wait
-kubectl get pod anvil-0        # 2/2: anvil + exporter
-kubectl exec anvil-0 -c anvil -- cast rpc evm_mine
-```
-
-En Prometheus, `anvil_block_number` sube con cada `evm_mine` (o con cada
-transacción). Con dos contenedores en el pod, `kubectl exec` y `kubectl logs`
-necesitan `-c anvil`. Sin tráfico Anvil no mina (automine), así que una alerta
-de "bloque sin avanzar" se dispara sola: agregá `--block-time` o tenela en cuenta.
-
-## Pista IA: el modelo bajo carga
-
-```bash
-helm upgrade --install model helm/charts/model -f helm/charts/model/values-k3s.yaml --wait
-kubectl create configmap k6-script --from-file=loadtest/k6-script.js --dry-run=client -o yaml | kubectl apply -f -
-kubectl delete job k6 --ignore-not-found
-kubectl apply -f loadtest/k6-job.yaml       # TARGET=model, SLEEP=0.05
-kubectl get hpa model -w                    # Ctrl+C para salir
-```
-
-El dashboard `Model server` muestra predicciones/s, latencia p95 y las réplicas
-del HPA. La carga se genera **adentro del cluster**: un port-forward manda todo
-a un solo pod y las réplicas nuevas no reciben tráfico.
-
-Las métricas del modelo son `model_predictions_total` y el histograma
-`model_predict_seconds`. Si querés una métrica propia (por ejemplo la
-confianza), agregala en `model/serve.py` con `prometheus_client`.
-
 > ### En la nube (GKE)
 >
 > Los mismos comandos sirven contra el cluster de GKE de la clase 5 (con
@@ -199,6 +164,4 @@ kubectl get crd -o name | grep monitoring.coreos.com | xargs kubectl delete    #
 | El target no aparece en `/targets` | No aplicaste los ServiceMonitors, o tu Service no tiene `app.kubernetes.io/name` | `kubectl apply -f observability/servicemonitors.yaml`; `kubectl get svc --show-labels` |
 | `{app="servicio-patron"} \|= "error"` no trae nada | El servicio loguea `404 Not Found`, no "error" | Buscá `\|= "404"` |
 | `kubectl get pods -l app=loki` no encuentra nada | La etiqueta del chart es otra | `-l app.kubernetes.io/name=loki` |
-| `anvil-0` en `ErrImageNeverPull` | La imagen del exporter no está en el cluster | `make k3d-images` |
-| `kubectl exec anvil-0 -- cast ...` dice `container not found` o entra al exporter | El pod tiene dos contenedores | `kubectl exec anvil-0 -c anvil -- cast ...` |
 | Pods `Pending` con disk-pressure | Disco de tu máquina casi lleno | Ver la clase 5 |
