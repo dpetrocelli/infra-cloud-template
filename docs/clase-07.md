@@ -1,27 +1,21 @@
-# Clase 7: IA (Vertex AI, Ollama, vast.ai) · Blockchain (Layer 2, Base Sepolia)
+# Clase 7: del artefacto local a la nube, medido
 
 ## Objetivo
 
-Cada pista lleva su artefacto a "su" nube y lo mide.
-
-- **IA**: el servidor de `model/` es el *stand-in* local de un endpoint de
-  inferencia. Lo medís en tu laptop y comparás con una opción administrada
-  (Vertex AI / Cloud Run), una autogestionada (Ollama en una VM) o una GPU
-  alquilada (vast.ai).
-- **BC**: el mismo contrato (`contracts/src/Counter.sol`), desplegado primero en
-  Anvil local y después en un rollup L2 de prueba (Base Sepolia).
-
-Lo que se entrega es lo que pide el lab de Moodle de tu pista; esta guía te
-deja todo lo del repo funcionando para hacerlo.
-
-## Prerrequisitos
-
-- [ ] `make doctor` sin `[FAIL]`, en la raíz del repo.
-- [ ] IA: `make build-model` (imagen `model:local`).
-- [ ] BC: nada más (Foundry corre en Docker). Para testnet: una billetera de
-      prueba (MetaMask) con ETH de Base Sepolia.
+Llevás el artefacto de tu pista a la nube y lo medís. Cada pista es una
+sección independiente: seguí solo la tuya. Lo que se entrega es lo que pide el
+lab de tu aula; esta guía te deja todo lo del repo funcionando para hacerlo.
 
 ## Pista IA
+
+El servidor de `model/` es el *stand-in* local de un endpoint de inferencia. Lo
+medís en tu laptop y comparás con una opción administrada (Vertex AI / Cloud
+Run), una autogestionada (Ollama en una VM) o una GPU alquilada (vast.ai).
+
+### 0. Prerrequisitos
+
+- [ ] `make doctor` sin `[FAIL]`, en la raíz del repo.
+- [ ] `make build-model` (imagen `model:local`).
 
 ### 1. El servidor y su contrato
 
@@ -72,11 +66,14 @@ curl -s -X POST localhost:18081/predict -H 'Content-Type: application/json' -d '
 > ```bash
 > export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
 > export AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/infra-cloud-template"
-> docker tag model:local "$AR/model:v1" && docker push "$AR/model:v1"
+> gcloud services enable run.googleapis.com   # una sola vez por proyecto
+> docker build --platform linux/amd64 -t "$AR/model:v1" ./model && docker push "$AR/model:v1"
 > gcloud run deploy model-server --image="$AR/model:v1" --region="$REGION" --port=8081 --allow-unauthenticated
 > URL=$(gcloud run services describe model-server --region="$REGION" --format='value(status.url)')
 > curl -s -X POST "$URL/predict" -H 'Content-Type: application/json' -d '{"features":[5.1,3.5,1.4,0.2]}'
 > ```
+>
+> (`--platform linux/amd64` es obligatorio en Mac M1/M2/M3: Cloud Run solo corre amd64.)
 >
 > **Vertex AI**: un *custom container* de Vertex recibe `{"instances": [...]}`
 > en la ruta que le indiques y responde `{"predictions": [...]}`; nuestro
@@ -97,7 +94,33 @@ curl -s -X POST localhost:18081/predict -H 'Content-Type: application/json' -d '
 > Al terminar: `gcloud run services delete model-server --region="$REGION"` y
 > apagá/borrá cualquier VM o instancia con GPU (se cobran por hora).
 
+### Limpieza
+
+```bash
+docker rm -f model 2>/dev/null
+```
+
+Y lo de la nube, en el recuadro de arriba.
+
+### Errores frecuentes
+
+| Si ves | Causa | Hacé |
+|---|---|---|
+| `port is already allocated` | Quedó un contenedor `model` u otro servicio en el 8081 | `docker ps` y `docker rm -f model` |
+| `hey` se cuelga contra la VM | El firewall solo abre 8080 | Medí desde la VM o con un túnel SSH |
+| `ImagePullBackOff` del modelo en k3s | No importaste la imagen o usaste `values.yaml` | `make k3d-images` y `-f values-k3s.yaml` |
+| Pods evicted (`ephemeral-storage`) | Disco casi lleno | Ver la clase 5 |
+
 ## Pista BC
+
+El mismo contrato (`contracts/src/Counter.sol`), desplegado primero en Anvil
+local y después en un rollup L2 de prueba (Base Sepolia).
+
+### 0. Prerrequisitos
+
+- [ ] `make doctor` sin `[FAIL]`, en la raíz del repo.
+- [ ] Para testnet: una billetera de prueba (MetaMask) con ETH de Base Sepolia.
+      Foundry no hace falta: corre en Docker.
 
 ### 1. Tests del contrato
 
@@ -139,12 +162,14 @@ dirección es siempre esa).
 ### 3. Usalo
 
 ```bash
-DC="docker compose -f compose/docker-compose.anvil.yml"
+dc() { docker compose -f compose/docker-compose.anvil.yml "$@"; }
 ADDR=0x5FbDB2315678afecb367f032d93F642f64180aa3
-$DC exec anvil cast send $ADDR "increment()" --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url http://localhost:8545
-$DC exec anvil cast call $ADDR "number()(uint256)" --rpc-url http://localhost:8545      # 1
-$DC exec anvil cast logs --address $ADDR --from-block 0 --rpc-url http://localhost:8545 # el evento NumberChanged
+dc exec anvil cast send $ADDR "increment()" --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url http://localhost:8545
+dc exec anvil cast call $ADDR "number()(uint256)" --rpc-url http://localhost:8545      # 1
+dc exec anvil cast logs --address $ADDR --from-block 0 --rpc-url http://localhost:8545 # el evento NumberChanged
 ```
+
+(`dc` es una función: funciona igual en bash y en zsh.)
 
 `cast logs` es la idea de un *indexer*: leer los eventos del contrato en vez de
 consultar su estado. Como el compose guarda la cadena (clase 3),
@@ -171,24 +196,24 @@ consultar su estado. Como el compose guarda la cadena (clase 3),
 >
 > Buscá la dirección en `https://sepolia.basescan.org` y compará gas y tiempo de
 > confirmación con Sepolia. Por pipeline: el job `deploy-testnet` de
-> `contracts.yml` hace lo mismo con un tag `vX.Y.Z` (ver clase 4: environment
-> `testnet`, secret `BASE_SEPOLIA_DEPLOYER_KEY`, variable `BASE_SEPOLIA_RPC_URL`).
+> `contracts.yml` hace lo mismo con un tag `vX.Y.Z` (ver
+> [contracts/README.md](../contracts/README.md): environment `testnet`, secret
+> `BASE_SEPOLIA_DEPLOYER_KEY`, variable `BASE_SEPOLIA_RPC_URL`).
 >
 > Un rollup *optimistic* (Base) asume que los lotes son válidos y solo los
 > disputa si alguien presenta una prueba de fraude dentro de una ventana de
 > desafío; un rollup *ZK* prueba cada lote antes de aceptarlo. Comparalos en
 > [L2Beat](https://l2beat.com).
 
-## Limpieza
+### Limpieza
 
 ```bash
-docker rm -f model 2>/dev/null
 make compose-anvil-reset
 rm -rf contracts/broadcast contracts/cache contracts/out
 unset DEPLOYER_PRIVATE_KEY
 ```
 
-## Errores frecuentes
+### Errores frecuentes
 
 | Si ves | Causa | Hacé |
 |---|---|---|
@@ -197,8 +222,6 @@ unset DEPLOYER_PRIVATE_KEY
 | `contract ... does not have any code` | Anvil se reinició sin estado | Usá el compose del repo (persiste); redeployá |
 | `insufficient funds` en testnet | La cuenta no tiene ETH de Base Sepolia | Faucet |
 | `forge: command not found` | Foundry no instalado | `make test-contracts` o el comando con Docker de arriba |
-| `port is already allocated` | Quedó un contenedor (`model`, el compose de otra clase) | `docker ps` y `docker rm -f ...` / `make compose-down` |
-| `hey` se cuelga contra la VM | El firewall solo abre 8080 | Medí desde la VM o con un túnel SSH |
-| `ImagePullBackOff` del modelo en k3s | No importaste la imagen o usaste `values.yaml` | `make k3d-images` y `-f values-k3s.yaml` |
+| `port is already allocated` | Quedó un contenedor o el compose de otra clase en el 8545 o el 8080 | `docker ps` y `docker rm -f ...` / `make compose-down` |
 | Pods evicted (`ephemeral-storage`) | Disco casi lleno | Ver la clase 5 |
 | `rpc.sepolia.org` no responde | Ese RPC público dejó de funcionar | El de publicnode de la tabla |
