@@ -39,7 +39,9 @@ resource "google_compute_firewall" "allow_app_port" {
     ports    = [for p in concat([var.app_port], var.extra_ports) : tostring(p)]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  # Open to the world by default (the class demos curl the VM from a laptop).
+  # Narrow it with app_source_ranges for anything whose keys are public.
+  source_ranges = var.app_source_ranges
   target_tags   = ["app-server"]
 }
 

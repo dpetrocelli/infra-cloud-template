@@ -7,3 +7,6 @@ servicio_patron_image = "southamerica-east1-docker.pkg.dev/my-project-id/infra-c
 
 # Class 5 onward (costs money while it exists):
 # enable_gke = true
+
+# Who can reach app_port on the VM (default: anyone). Narrow it for an RPC:
+# app_source_ranges = ["<your-ip>/32"]

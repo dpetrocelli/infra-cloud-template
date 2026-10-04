@@ -31,3 +31,9 @@ variable "extra_ports" {
   type        = list(number)
   default     = []
 }
+
+variable "app_source_ranges" {
+  description = "Source ranges allowed on app_port/extra_ports (allow-app). Narrow it (e.g. [\"<your-ip>/32\"]) for anything like an Anvil RPC whose keys are public."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

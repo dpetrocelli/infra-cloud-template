@@ -33,6 +33,8 @@ module "network" {
   name_prefix = local.name_prefix
   region      = var.region
   app_port    = var.app_port
+
+  app_source_ranges = var.app_source_ranges
 }
 
 # The registry is created by ONE env only (enable_artifact_registry): both
