@@ -1,9 +1,13 @@
-# Class 6 (Observability: Cloud Monitoring, Prometheus, Grafana, Loki).
-# Minimal values.yaml for the `kube-prometheus-stack` Helm chart
-# (prometheus-community/kube-prometheus-stack), sized for a classroom GKE
-# cluster. Install with:
+# Class 6 (Observability: Prometheus, Grafana, Loki).
+# Minimal values for the kube-prometheus-stack Helm chart, sized for a
+# classroom cluster (k3d on your laptop or a small GKE). Tested with 91.9.0:
 #   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-#   helm install kube-prom prometheus-community/kube-prometheus-stack -f kube-prometheus-stack-values.yaml
+#   export GRAFANA_PASS='pick-one'   # never commit it
+#   helm upgrade --install kube-prom prometheus-community/kube-prometheus-stack \
+#     --version 91.9.0 -n observability --create-namespace \
+#     -f observability/kube-prometheus-stack-values.yaml \
+#     --set grafana.adminPassword="$GRAFANA_PASS" --wait
+# Install everything in the "observability" namespace: the Loki URL below uses it.
 
 prometheus:
   prometheusSpec:
@@ -15,11 +19,17 @@ prometheus:
       limits:
         cpu: 500m
         memory: 512Mi
-    # Only scrape ServiceMonitors we explicitly label, to keep this small.
+    # false = Prometheus picks up EVERY ServiceMonitor in any namespace,
+    # whatever its labels. That is why servicemonitors.yaml needs no
+    # `release:` label.
     serviceMonitorSelectorNilUsesHelmValues: false
 
 grafana:
-  adminPassword: "" # set via --set grafana.adminPassword=... at install time, never commit it
+  # Empty here on purpose: pass it with --set grafana.adminPassword=... at
+  # install time. If you forget, the chart generates a random one:
+  #   kubectl -n observability get secret kube-prom-grafana \
+  #     -o jsonpath='{.data.admin-password}' | base64 -d
+  adminPassword: ""
   resources:
     requests:
       cpu: 50m
@@ -27,12 +37,23 @@ grafana:
     limits:
       cpu: 200m
       memory: 256Mi
-  # Pre-load the class dashboards from observability/dashboards/*.json via a
-  # sidecar that watches ConfigMaps labeled grafana_dashboard=1.
   sidecar:
+    # Loads observability/dashboards/*.json from ConfigMaps labeled
+    # grafana_dashboard=1, in any namespace.
     dashboards:
       enabled: true
       label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+    datasources:
+      alertmanager:
+        enabled: false # Alertmanager is off below; avoid a broken data source
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki-gateway.observability.svc.cluster.local
 
 alertmanager:
-  enabled: false # keep the classroom stack simple; alerting is out of scope
+  enabled: false # keep the classroom stack small; alert rules live in Grafana
