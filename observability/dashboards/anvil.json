@@ -1,5 +1,5 @@
 {
-  "title": "Anvil (BC dev chain)",
+  "title": "Anvil dev chain",
   "uid": "anvil",
   "tags": ["catedra", "infra-cloud-template", "blockchain"],
   "timezone": "browser",

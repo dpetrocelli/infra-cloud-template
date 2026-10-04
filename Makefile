@@ -42,7 +42,7 @@ test: test-app test-model test-pow test-exporter test-contracts ## every test su
 test-app: ## pytest of the servicio patron (class 1)
 	cd app && $(PYTEST)
 
-test-model: ## pytest of the IA model server
+test-model: ## pytest of the example model server (model/)
 	@if [ -d model ]; then cd model && $(PYTEST); else echo "skip: no model/ folder"; fi
 
 test-pow: ## pytest of the PoW baseline node

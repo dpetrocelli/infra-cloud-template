@@ -25,7 +25,7 @@ fi
 command -v uv >/dev/null && ok uv "$(ver uv --version)" || bad uv "needed for make test: curl -LsSf https://astral.sh/uv/install.sh | sh"
 
 echo "Optional (by class)"
-command -v forge >/dev/null && ok forge "$(ver forge --version)" || warn forge "class 4/7 BC: not needed, make test-contracts uses the Foundry docker image"
+command -v forge >/dev/null && ok forge "$(ver forge --version)" || warn forge "contracts/ only: not needed, make test-contracts uses the Foundry docker image"
 if command -v tofu >/dev/null; then ok tofu "$(ver tofu version)"; elif command -v terraform >/dev/null; then ok terraform "$(ver terraform version)"; else warn "tofu/terraform" "class 2: install OpenTofu (https://opentofu.org) or Terraform >= 1.6"; fi
 command -v gcloud >/dev/null && ok gcloud "$(ver gcloud --version)" || warn gcloud "classes 1-4 and 8 in GCP: https://cloud.google.com/sdk/docs/install"
 command -v kubectl >/dev/null && ok kubectl "$(kubectl version --client 2>/dev/null | head -n1)" || warn kubectl "class 5+: https://kubernetes.io/docs/tasks/tools/"

@@ -23,7 +23,7 @@ con `kubectl exec anvil-0 -c anvil -- cast rpc evm_mine` o justificá la ventana
 Para esa alerta usá `changes(anvil_block_number[5m]) == 0`: `anvil_block_number`
 es un gauge, y `rate()`/`increase()` van sobre counters.
 
-En Grafana, el dashboard `Anvil (BC dev chain)` muestra la altura de bloque. El
+En Grafana, el dashboard `Anvil dev chain` muestra la altura de bloque. El
 de la línea base PoW (`Mini PoW baseline`) trae solo la altura de bloque por
 nodo: los paneles de tu red los agregás en el TF.
 
