@@ -17,9 +17,10 @@ Run workflow "deploy" (image_tag=<sha>) ─> terraform ─> GKE ─> helm upgrad
 
 Al terminar tenés:
 
-1. Un **ensayo completo en tu laptop** (k3d): despliegue, verificación, carga y escalado.
-2. BC: la **línea base** del nodo PoW desplegada (minando, con su cadena en un PVC) y el plan
-   de cómo la extendés a tu red. IA: el modelo escalando de 2 a más réplicas.
+1. Un **ensayo completo en tu laptop** (k3d) con el servicio patrón: despliegue,
+   verificación, carga y un nuevo deploy.
+2. Lo mismo con la carga de la pista de tu diplomatura:
+   [docs/bc/clase-08.md](bc/clase-08.md) o [docs/ia/clase-08.md](ia/clase-08.md).
 3. (En la nube) el mismo flujo con `deploy.yml` contra GKE.
 
 ## Prerrequisitos
@@ -42,101 +43,53 @@ make k3d-images
 Los mismos pasos 1 a 4 de la [clase 6](clase-06.md) (kube-prometheus-stack,
 ServiceMonitors y dashboards). Loki es opcional hoy.
 
-### 3. Desplegá tu pista
-
-BC (la línea base, un nodo):
+### 3. Desplegá y verificá el servicio patrón
 
 ```bash
-helm upgrade --install pow helm/charts/pow -f helm/charts/pow/values-k3s.yaml --wait
-kubectl get pods,pvc -l app=pow             # pow-0 Running y su PVC data-pow-0 Bound
+helm upgrade --install servicio-patron helm/charts/servicio-patron \
+  -f helm/charts/servicio-patron/values-k3s.yaml --wait
+kubectl get pods,pvc,hpa -l app=servicio-patron
+kubectl port-forward svc/servicio-patron 18080:8080    # otra terminal
+curl -s localhost:18080/healthz; echo
+curl -s localhost:18080/
 ```
 
-IA:
+Esperado: `servicio-patron-0` en `Running`, su PVC `Bound`, `{"status":"ok"}`
+y el contador de visitas.
 
-```bash
-helm upgrade --install model helm/charts/model -f helm/charts/model/values-k3s.yaml --wait
-kubectl get deploy,hpa model -w             # Ctrl+C cuando haya 2 réplicas
-```
-
-IA: sin el HPA el chart pondría las réplicas fijas; con el HPA prendido no las
-pone (si no, cada `helm upgrade` pisaría lo que decidió el HPA). Por eso una
-instalación nueva arranca con **1 pod** y en unos segundos el HPA la lleva a
-`minReplicas` (2). `helm --wait` vuelve antes: esperá con el `-w`.
-
-BC: el chart de `pow` no trae HPA. La línea base es un solo nodo y escalar
-nodos que no se sincronizan solo crea cadenas sueltas. Si tu red escala sola,
-y cómo, es una decisión de diseño de tu TF.
-
-### 4. Verificá
-
-BC, la línea base:
-
-```bash
-kubectl port-forward pod/pow-0 18090:8090    # otra terminal
-curl -s localhost:18090/healthz; echo
-curl -s -X POST localhost:18090/tx -H 'Content-Type: application/json' -d '{"sender":"ana","to":"beto","amount":1}'; echo
-curl -s -X POST localhost:18090/mine | head -c 200; echo
-curl -s localhost:18090/chain | python3 -c 'import json,sys; c=json.load(sys.stdin); print(len(c)-1, c[-1]["hash"])'
-curl -s localhost:18090/metrics | grep '^pow_block_height'
-```
-
-Esperado: `/mine` devuelve el bloque 1 con un hash que empieza con `000`
-(dificultad fija), `/chain` tiene altura 1 y `pow_block_height` vale 1. Borrá el
-pod (`kubectl delete pod pow-0`): vuelve con la misma cadena, porque vive en el PVC.
-
-**De acá en adelante es tu TF.** Lo que falta está marcado `TODO(TF)` en
-`pow/blockchain.py` y `pow/node.py`: dificultad ajustable, validar la cadena
-que llega de otro nodo, peers (`GET /peers`, `POST /peers/sync`), consenso por
-la cadena más larga y válida, reglas del mempool y seguridad ante concurrencia.
-El chart ya te da lo de infraestructura: `--set replicaCount=3` levanta
-`pow-0..2`, cada uno con su disco y su nombre DNS estable, y les pasa la lista
-en la variable `PEERS`. Hoy son tres cadenas independientes; el mínimo del TF es
-**al menos 2 nodos que sincronizan**, en la nube.
-
-IA, el modelo:
-
-```bash
-kubectl port-forward svc/model 18081:8081    # otra terminal
-curl -s -X POST localhost:18081/predict -H 'Content-Type: application/json' -d '{"features":[5.1,3.5,1.4,0.2]}'; echo
-```
-
-### 5. Carga y escalado
+### 4. Carga y escalado
 
 La carga se genera **adentro del cluster** (un port-forward mandaría todo a un
-solo pod):
+solo pod). `loadtest/k6-job.yaml` elige el destino con `TARGET`; para el
+servicio patrón:
 
 ```bash
 kubectl create configmap k6-script --from-file=loadtest/k6-script.js --dry-run=client -o yaml | kubectl apply -f -
 kubectl delete job k6 --ignore-not-found
-kubectl apply -f loadtest/k6-job.yaml
-kubectl get hpa -w
+sed 's/value: model$/value: servicio-patron/' loadtest/k6-job.yaml | kubectl apply -f -
+kubectl get hpa servicio-patron -w        # Ctrl+C para salir
 ```
 
-`loadtest/k6-job.yaml` viene con `TARGET=model` y `SLEEP=0.05`. Para BC el
-script no trae un escenario de `pow`: cuando tu red funcione, sumá uno que
-ejercite tus endpoints (por ejemplo `POST /tx` y, cada tanto, `POST /mine`).
-
-Esperado para el modelo: las réplicas pasan de 2 a 4 o más en uno o dos
-minutos (lo medimos: 2 → 4 → 6 → 8). Al terminar la carga bajan solas en unos 5
-minutos. En Grafana, `Model server` muestra la latencia y las réplicas, y
-`Mini PoW baseline` la altura de cada nodo (los paneles de tu red los agregás vos).
-
 `kubectl logs job/k6` muestra el resumen: `checks` cerca de 100% y
-`http_req_failed` debajo de 5%.
+`http_req_failed` debajo de 5%. En Grafana, el dashboard `Servicio patron`
+muestra requests/s y latencia mientras dura la carga. El valor de `TARGET` y
+`SLEEP` para la carga de tu pista está en su guía.
 
-### 6. Un cambio y un nuevo deploy
+### 5. Un cambio y un nuevo deploy
 
-Hacé un cambio visible (BC: un campo nuevo en la respuesta de `/mine`, o tu primer `TODO(TF)`; IA: un
-`model_version` en la respuesta de `/predict`), corré `make test`, reconstruí y
-actualizá:
+Hacé un cambio visible (por ejemplo, otro texto en la respuesta de `GET /` en
+`app/main.py`), corré `make test`, reconstruí y actualizá:
 
 ```bash
 make k3d-images TAG=v2
-helm upgrade pow helm/charts/pow -f helm/charts/pow/values-k3s.yaml --set image.tag=v2 --wait     # o model
-kubectl rollout status statefulset/pow    # deploy/model para IA
+helm upgrade servicio-patron helm/charts/servicio-patron \
+  -f helm/charts/servicio-patron/values-k3s.yaml --set image.tag=v2 --wait
+kubectl rollout status statefulset/servicio-patron
+curl -s localhost:18080/       # relanzá el port-forward si se cortó
 ```
 
-Las réplicas que había elegido el HPA se mantienen durante el upgrade.
+Las réplicas que había elegido el HPA se mantienen durante el upgrade, y el
+contador sigue: vive en el PVC.
 
 > ### En la nube (deploy.yml contra GKE)
 >
@@ -144,6 +97,8 @@ Las réplicas que había elegido el HPA se mantienen durante el upgrade.
 >
 > ```bash
 > export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export POOL_ID="github-pool"          # el pool de Workload Identity de la clase 4
+> export REPO="<usuario>/<repo>"        # tu repo, exacto
 > gcloud storage buckets create "gs://${PROJECT_ID}-tfstate" --location="$REGION"   # si no lo creaste en la clase 2
 > gcloud services enable container.googleapis.com compute.googleapis.com
 > gcloud iam service-accounts create ci-deployer
@@ -153,8 +108,9 @@ Las réplicas que había elegido el HPA se mantienen durante el upgrade.
 >   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${DSA}" --role="$role"
 > done
 > # El mismo binding de OIDC de la clase 4, ahora para esta cuenta:
+> PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 > gcloud iam service-accounts add-iam-policy-binding "$DSA" --role=roles/iam.workloadIdentityUser \
->   --member="principalSet://iam.googleapis.com/projects/<NÚMERO>/locations/global/workloadIdentityPools/github/attribute.repository/<usuario>/<repo>"
+>   --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/attribute.repository/${REPO}"
 > ```
 >
 > En GitHub:
@@ -170,14 +126,15 @@ Las réplicas que había elegido el HPA se mantienen durante el upgrade.
 > 1. `git push` a `main` y esperá que `ci` publique (el sha está en el log de
 >    `publish`: `pushed .../app:<sha>`; o `git rev-parse HEAD`).
 > 2. **Actions → deploy → Run workflow**: `env=dev`, `image_tag=<ese sha>` (o
->    `v0.1.0` si creaste el tag). `latest` se rechaza.
+>    `v0.1.0` si creaste el tag) y `charts` con los charts de tu pista (el
+>    default es solo `servicio-patron`). `latest` se rechaza.
 > 3. El job `terraform` aplica la red y GKE (`enable_gke=true`); el job `helm`
->    hace `helm upgrade --install --wait` de `servicio-patron`, `model` y `pow`
->    con esa imagen. El primer run tarda ~15 minutos (crear el cluster). En
->    `dev` la imagen también va a la VM de la clase 2: cambiarla **recrea la VM**
->    (el disco de datos es otro recurso y queda).
+>    hace `helm upgrade --install --wait` de los charts del input `charts`, con
+>    esa imagen. El primer run tarda ~15 minutos (crear el cluster). En `dev`
+>    la imagen también va a la VM de la clase 2: cambiarla **recrea la VM** (el
+>    disco de datos es otro recurso y queda).
 > 4. `gcloud container clusters get-credentials infra-cloud-dev-gke --zone southamerica-east1-a`
->    y repetí los pasos 4 y 5 de arriba contra GKE (sin `-f values-k3s.yaml`).
+>    y repetí los pasos 3 y 4 de arriba contra GKE (sin `-f values-k3s.yaml`).
 >
 > **Al terminar**, GKE se cobra por hora: desde `terraform/envs/dev`,
 > `tofu destroy -var-file=dev.tfvars -var enable_gke=true` (o al menos
@@ -188,7 +145,7 @@ Las réplicas que había elegido el HPA se mantienen durante el upgrade.
 
 ```bash
 kubectl delete job k6 --ignore-not-found
-helm uninstall --ignore-not-found pow model servicio-patron
+helm uninstall --ignore-not-found servicio-patron
 helm uninstall --ignore-not-found kube-prom loki alloy -n observability
 make k3d-down
 ```
@@ -197,17 +154,16 @@ make k3d-down
 
 | Si ves | Causa | Hacé |
 |---|---|---|
-| PVC `Pending`, `storageclass "standard" not found` | Instalaste con los valores de GKE | `helm uninstall pow`, `kubectl delete pvc -l app=pow`, reinstalá con `-f values-k3s.yaml` |
-| `UPGRADE FAILED: ... updates to statefulset spec ... are forbidden` | Cambiaste StorageClass, tamaño o `PEERS` de un release existente | `helm uninstall pow`, `kubectl delete pvc -l app=pow` y reinstalá |
-| `422` en `POST /tx` | Falta `-H 'Content-Type: application/json'` o el campo es `sender` (no `from`) | Copiá el curl de arriba |
-| `404` en `/peers` o `/peers/sync` | La línea base no los trae | Es `TODO(TF)` en `pow/node.py` |
-| Con 3 réplicas cada nodo tiene otra altura | Sin `/peers/sync` no hay consenso | Es el corazón del TF |
+| PVC `Pending`, `storageclass "standard" not found` | Instalaste con los valores de GKE | `helm uninstall <release>`, `kubectl delete pvc -l app=<release>`, reinstalá con `-f values-k3s.yaml` |
+| `UPGRADE FAILED: ... updates to statefulset spec ... are forbidden` | Cambiaste StorageClass, tamaño u otro campo fijo de un StatefulSet existente | `helm uninstall <release>`, `kubectl delete pvc -l app=<release>` y reinstalá |
 | `error: lost connection to pod` | El HPA borró el pod del port-forward al bajar réplicas | Relanzá el port-forward |
-| El HPA no pasa de 2 réplicas | Poca carga (k6 por port-forward o `SLEEP=1`) | El Job de k6 con `SLEEP=0.05` |
+| `field is immutable` al aplicar el Job de k6 | Quedó el Job de una corrida anterior | `kubectl delete job k6 --ignore-not-found` y aplicalo de nuevo |
+| El HPA no sube réplicas | Poca carga (k6 por port-forward o `SLEEP=1`) | El Job de k6, adentro del cluster |
 | El HPA sube sin carga recién instalado | CPU del arranque | Esperá ~5 min antes de medir la línea base |
 | HPA `<unknown>` | metrics-server sin datos todavía | Esperá un minuto |
 | `publish` skipped en `ci` | Faltan las variables de la clase 4 | Cargalas; no hay imagen para desplegar sin eso |
 | `deploy` falla en `terraform init` con `bucket doesn't exist` | No creaste `gs://<proyecto>-tfstate` | El `gcloud storage buckets create` de arriba |
 | `deploy` falla con `image_tag must be a git sha or vX.Y.Z` | Pusiste `latest` o nada | El sha que publicó `ci` |
 | `ImagePullBackOff` en GKE | Ese tag no existe en Artifact Registry | `gcloud artifacts docker images list $AR --include-tags` |
+| En GKE aparecen pods de un chart que no usás | Lanzaste `deploy` con otro valor de `charts` | `helm uninstall <release>` y `kubectl delete pvc -l app=<release>` |
 | `Error 409: already exists` en el plan de `prod` | El registry ya lo creó `dev` | Es el default (`enable_artifact_registry = false` en prod); no lo prendas |
