@@ -4,6 +4,9 @@ metadata:
   name: {{ include "model.fullname" . }}
   labels:
     app: {{ include "model.fullname" . }}
+    # Fixed label (does not depend on the release name): the ServiceMonitors
+    # in observability/servicemonitors.yaml select on it.
+    app.kubernetes.io/name: model
 spec:
   selector:
     app: {{ include "model.fullname" . }}

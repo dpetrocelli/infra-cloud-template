@@ -1,8 +1,10 @@
 // Class 6/8: quick load test used to trigger the HPA on servicio-patron,
-// model and pow. Run with:
+// model and pow. Run with (k6 installed, or `make loadtest`, which falls back
+// to the grafana/k6 docker image):
 //   k6 run loadtest/k6-script.js
-//   k6 run -e TARGET=servicio-patron loadtest/k6-script.js
 //   k6 run -e TARGET=model -e MODEL_URL=http://localhost:8081 loadtest/k6-script.js
+// To really move the HPA run it INSIDE the cluster (loadtest/k6-job.yaml):
+// a port-forward sends every request to a single pod.
 //
 // Env vars (all optional, sensible localhost defaults -- no hardcoded
 // cluster hostnames):
@@ -10,8 +12,17 @@
 //   SERVICIO_PATRON_URL    default http://localhost:8080
 //   MODEL_URL              default http://localhost:8081
 //   POW_URL                default http://localhost:8090
+//   SLEEP                  seconds each virtual user waits between iterations
+//                          (default 1). The model is so light that it needs
+//                          about 0.05 to push the HPA past 60% CPU.
+//   MINE_PROB              share of pow iterations that also call /mine (0.1)
+//   PEAK_VUS               virtual users at the peak (default 30)
 import http from "k6/http";
 import { check, sleep } from "k6";
+
+const SLEEP = Number(__ENV.SLEEP || 1);
+const MINE_PROB = Number(__ENV.MINE_PROB || 0.1);
+const PEAK_VUS = Number(__ENV.PEAK_VUS || 30);
 
 export const options = {
   scenarios: {
@@ -19,8 +30,8 @@ export const options = {
       executor: "ramping-vus",
       startVUs: 1,
       stages: [
-        { duration: "30s", target: 10 },
-        { duration: "1m", target: 30 }, // enough sustained load to trip a 60-70% CPU HPA target
+        { duration: "30s", target: Math.max(1, Math.round(PEAK_VUS / 3)) },
+        { duration: "1m", target: PEAK_VUS }, // sustained load to trip a 60-70% CPU HPA target
         { duration: "30s", target: 0 },
       ],
     },
@@ -52,7 +63,7 @@ export default function () {
 
     // Mine occasionally, not on every VU iteration, to keep the mining
     // pool from growing unbounded difficulty-wise during the test.
-    if (Math.random() < 0.1) {
+    if (Math.random() < MINE_PROB) {
       const mineRes = http.post(`${POW_URL}/mine`);
       check(mineRes, { "mine 200": (r) => r.status === 200 });
     }
@@ -61,5 +72,5 @@ export default function () {
     check(res, { "root 200": (r) => r.status === 200 });
   }
 
-  sleep(1);
+  sleep(SLEEP);
 }

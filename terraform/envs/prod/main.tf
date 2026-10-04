@@ -35,8 +35,12 @@ module "network" {
   app_port    = var.app_port
 }
 
+# The registry is created by ONE env only (enable_artifact_registry): both
+# envs live in the same project and region, so creating it twice fails with
+# "409 already exists". The other env just uses its URL.
 module "artifact_registry" {
   source = "../../modules/artifact-registry"
+  count  = var.enable_artifact_registry ? 1 : 0
 
   project_id    = var.project_id
   region        = var.region
@@ -45,6 +49,7 @@ module "artifact_registry" {
 
 module "vm" {
   source = "../../modules/vm"
+  count  = var.enable_vm ? 1 : 0
 
   name            = "${local.name_prefix}-vm"
   zone            = var.zone
@@ -54,7 +59,8 @@ module "vm" {
   app_port        = var.app_port
 }
 
-# GKE is on by default in prod (class 8 needs it).
+# GKE is on by default in prod (class 8 needs it). The VM is off by default
+# in prod (enable_vm): class 8 only needs the cluster, and a VM costs money.
 module "gke" {
   source = "../../modules/gke"
   count  = var.enable_gke ? 1 : 0
@@ -65,4 +71,8 @@ module "gke" {
   network_id     = module.network.network_id
   subnetwork_id  = module.network.subnetwork_id
   max_node_count = 2
+}
+
+locals {
+  artifact_registry_url = "${var.region}-docker.pkg.dev/${var.project_id}/infra-cloud-template"
 }

@@ -4,7 +4,7 @@ variable "name" {
 }
 
 variable "zone" {
-  description = "GCP zone, e.g. \"us-central1-a\"."
+  description = "GCP zone, e.g. \"southamerica-east1-a\"."
   type        = string
 }
 
@@ -55,7 +55,7 @@ variable "container_name" {
 }
 
 variable "container_image" {
-  description = "Container image to run, e.g. \"REGION-docker.pkg.dev/PROJECT/REPO/servicio-patron:TAG\". No default: must come from Artifact Registry, never hardcoded here."
+  description = "Container image to run, e.g. \"southamerica-east1-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:v1\". No default: never hardcoded here."
   type        = string
 }
 
@@ -63,4 +63,28 @@ variable "app_port" {
   description = "Port exposed by the container and opened in the firewall."
   type        = number
   default     = 8080
+}
+
+variable "service_account_email" {
+  description = "Service account attached to the VM (needs roles/artifactregistry.reader to pull private images). null = Compute Engine default service account."
+  type        = string
+  default     = null
+}
+
+variable "container_entrypoint" {
+  description = "Overrides the image ENTRYPOINT (\"\" = keep it). Anvil needs \"anvil\" so it is PID 1 and gets the stop signal."
+  type        = string
+  default     = ""
+}
+
+variable "container_args" {
+  description = "Arguments appended after the image, e.g. [\"--host\", \"0.0.0.0\", \"--state\", \"/data/anvil-state.json\", \"--state-interval\", \"5\"]."
+  type        = list(string)
+  default     = []
+}
+
+variable "data_uid" {
+  description = "If > 0, chown the data disk to this uid before starting (Anvil/Foundry runs as 1000). 0 = leave it owned by root."
+  type        = number
+  default     = 0
 }

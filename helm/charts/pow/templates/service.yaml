@@ -6,6 +6,9 @@ metadata:
   name: {{ include "pow.fullname" . }}
   labels:
     app: {{ include "pow.fullname" . }}
+    # Fixed label (does not depend on the release name): the ServiceMonitors
+    # in observability/servicemonitors.yaml select on it.
+    app.kubernetes.io/name: pow
 spec:
   selector:
     app: {{ include "pow.fullname" . }}

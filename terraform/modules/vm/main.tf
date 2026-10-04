@@ -36,11 +36,22 @@ resource "google_compute_instance" "this" {
   }
 
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
-    disk_device_name = var.disk_device_name
-    container_name   = var.container_name
-    app_port         = var.app_port
-    image            = var.container_image
+    disk_device_name     = var.disk_device_name
+    container_name       = var.container_name
+    app_port             = var.app_port
+    image                = var.container_image
+    registry_host        = split("/", var.container_image)[0]
+    container_entrypoint = var.container_entrypoint
+    container_args       = var.container_args
+    data_uid             = var.data_uid
   })
+
+  # Without a service account the VM has no credentials and cannot pull a
+  # private Artifact Registry image. null = Compute Engine default account.
+  service_account {
+    email  = var.service_account_email
+    scopes = ["cloud-platform"]
+  }
 
   tags = ["ssh", "app-server"]
 

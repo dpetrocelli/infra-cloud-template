@@ -36,7 +36,7 @@ resource "google_compute_firewall" "allow_app_port" {
 
   allow {
     protocol = "tcp"
-    ports    = [tostring(var.app_port)]
+    ports    = [for p in concat([var.app_port], var.extra_ports) : tostring(p)]
   }
 
   source_ranges = ["0.0.0.0/0"]

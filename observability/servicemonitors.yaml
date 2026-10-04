@@ -1,21 +1,22 @@
-# Class 6: one ServiceMonitor per class Service, all labeled so
-# kube-prometheus-stack's Prometheus picks them up (see
-# kube-prometheus-stack-values.yaml). Apply with:
+# Class 6: one ServiceMonitor per class Service. Prometheus picks up every
+# ServiceMonitor (serviceMonitorSelectorNilUsesHelmValues: false in
+# kube-prometheus-stack-values.yaml), so no `release:` label is needed.
+# Apply with:
 #   kubectl apply -f observability/servicemonitors.yaml
 #
-# Adjust `release:` labels/selectors to match your Helm release name if you
-# changed it from the chart defaults.
+# They select the fixed label app.kubernetes.io/name that every chart puts on
+# its Service, so they work whatever release name you used, in any namespace.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: servicio-patron
-  labels:
-    release: kube-prom
 spec:
+  namespaceSelector:
+    any: true
   selector:
     matchLabels:
-      app: servicio-patron
+      app.kubernetes.io/name: servicio-patron
   endpoints:
     - port: http
       path: /metrics
@@ -25,12 +26,12 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: pow
-  labels:
-    release: kube-prom
 spec:
+  namespaceSelector:
+    any: true
   selector:
     matchLabels:
-      app: pow
+      app.kubernetes.io/name: pow
   endpoints:
     - port: http
       path: /metrics
@@ -40,12 +41,12 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: model
-  labels:
-    release: kube-prom
 spec:
+  namespaceSelector:
+    any: true
   selector:
     matchLabels:
-      app: model
+      app.kubernetes.io/name: model
   endpoints:
     - port: http
       path: /metrics
@@ -58,12 +59,12 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: anvil-exporter
-  labels:
-    release: kube-prom
 spec:
+  namespaceSelector:
+    any: true
   selector:
     matchLabels:
-      app: anvil-exporter
+      app.kubernetes.io/name: anvil-exporter
   endpoints:
     - port: http
       path: /metrics

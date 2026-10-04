@@ -3,7 +3,7 @@
 Endpoints:
   - GET  /chain            -> full local chain, as JSON
   - GET  /tx                -> pending tx pool
-  - POST /tx                -> {"from": "...", "to": "...", "amount": 1} add tx to the pool
+  - POST /tx                -> {"sender": "...", "to": "...", "amount": 1} add tx to the pool
   - POST /mine               -> mine a block with the pending pool, add it to our chain
   - GET  /peers              -> configured peers
   - POST /peers/sync          -> ask every peer for its chain, keep the best valid one
@@ -11,12 +11,17 @@ Endpoints:
 
 State (chain + difficulty) persists under DATA_DIR (default /data), same
 convention as the servicio patron: kill the container, keep the disk.
+
+Concurrency: FastAPI runs these sync endpoints in a thread pool, so the tx
+pool and chain.json are guarded by one lock and chain.json is replaced
+atomically. A /tx sent while this node mines waits until the block is done.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -49,6 +54,9 @@ MINING_SECONDS = Histogram(
 )
 
 _pending_tx: list[dict[str, Any]] = []
+# One lock for chain file + tx pool: FastAPI runs sync endpoints in a thread
+# pool, so concurrent /tx and /mine calls would otherwise race.
+_lock = threading.Lock()
 
 
 class Tx(BaseModel):
@@ -69,7 +77,9 @@ def _load_chain() -> list[Block]:
 
 def _save_chain(chain: list[Block]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    CHAIN_FILE.write_text(json.dumps([b.to_dict() for b in chain]))
+    tmp = CHAIN_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps([b.to_dict() for b in chain]))
+    os.replace(tmp, CHAIN_FILE)  # atomic: readers never see a half-written file
 
 
 def _update_gauges(chain: list[Block]) -> None:
@@ -111,17 +121,25 @@ def get_pending_tx() -> list[dict[str, Any]]:
 def add_tx(tx: Tx) -> dict[str, Any]:
     entry = tx.model_dump()
     entry["received_at"] = time.time()
-    _pending_tx.append(entry)
+    with _lock:
+        _pending_tx.append(entry)
     return entry
 
 
 @app.post("/mine")
 def mine_block() -> dict[str, Any]:
-    chain = _load_chain()
     global _pending_tx
-    txs = _pending_tx or [{"msg": "empty block"}]
-    block = new_block(chain, txs, DIFFICULTY)
+    with _lock:
+        chain = _load_chain()
+        txs = list(_pending_tx) or [{"msg": "empty block"}]  # snapshot, not alias
+        _pending_tx = []
+        block = new_block(chain, txs, DIFFICULTY)
+        return _mine_and_append(chain, block)
 
+
+def _mine_and_append(chain: list[Block], block: Block) -> dict[str, Any]:
+    """Called with _lock held: a /tx that arrives meanwhile waits, it never
+    changes a block that is already being hashed."""
     start = time.time()
     mine(block)
     elapsed = time.time() - start
@@ -129,7 +147,6 @@ def mine_block() -> dict[str, Any]:
 
     chain.append(block)
     _save_chain(chain)
-    _pending_tx = []
     _update_gauges(chain)
     return {"mined": block.to_dict(), "mining_seconds": elapsed}
 
@@ -143,7 +160,8 @@ def get_peers() -> list[str]:
 def sync_peers() -> dict[str, Any]:
     """Longest-valid-chain rule: fetch every peer's chain, keep the best one
     (including our own) among those that pass validate_chain()."""
-    local_chain = _load_chain()
+    with _lock:
+        local_chain = _load_chain()
     candidates = [local_chain]
 
     for peer in PEERS:
@@ -159,7 +177,8 @@ def sync_peers() -> dict[str, Any]:
         raise HTTPException(500, "no valid chain found among self + peers")
 
     replaced = best is not local_chain and best != local_chain
-    _save_chain(best)
+    with _lock:
+        _save_chain(best)
     _update_gauges(best)
     return {"replaced": replaced, "height": best[-1].index, "work": chain_work(best)}
 

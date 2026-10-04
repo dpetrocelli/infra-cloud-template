@@ -4,6 +4,9 @@ metadata:
   name: {{ include "servicio-patron.fullname" . }}
   labels:
     app: {{ include "servicio-patron.fullname" . }}
+    # Fixed label (does not depend on the release name): the ServiceMonitors
+    # in observability/servicemonitors.yaml select on it.
+    app.kubernetes.io/name: servicio-patron
 spec:
   selector:
     app: {{ include "servicio-patron.fullname" . }}

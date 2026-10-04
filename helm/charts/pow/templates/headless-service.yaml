@@ -7,7 +7,9 @@ kind: Service
 metadata:
   name: {{ include "pow.fullname" . }}-headless
   labels:
-    app: {{ include "pow.fullname" . }}
+    # Different from the regular Service on purpose (no app.kubernetes.io/name):
+    # otherwise the pow ServiceMonitor would scrape every pod twice.
+    app: {{ include "pow.fullname" . }}-headless
 spec:
   clusterIP: None
   selector:

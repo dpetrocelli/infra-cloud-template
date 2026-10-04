@@ -7,3 +7,8 @@ solc_version = "0.8.24"
 
 # Class 4 (BC): this is the config `forge test` reads in CI (contracts.yml).
 # Class 7 (BC): deploy to Base Sepolia uses the same contract, no code change.
+
+# The linter notes on every build look like failures to newcomers; run
+# `forge lint` on purpose instead.
+[lint]
+lint_on_build = false

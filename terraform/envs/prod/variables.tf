@@ -4,18 +4,21 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "GCP region, e.g. \"us-central1\"."
+  description = "GCP region. The course uses southamerica-east1 (Sao Paulo) everywhere."
   type        = string
+  default     = "southamerica-east1"
 }
 
 variable "zone" {
-  description = "GCP zone, e.g. \"us-central1-a\"."
+  description = "GCP zone inside the region."
   type        = string
+  default     = "southamerica-east1-a"
 }
 
 variable "servicio_patron_image" {
-  description = "Full Artifact Registry image reference for the servicio patron, produced by ci.yml."
+  description = "Image the VM runs (only used when enable_vm = true), e.g. southamerica-east1-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:<sha>."
   type        = string
+  default     = ""
 }
 
 variable "app_port" {
@@ -23,8 +26,20 @@ variable "app_port" {
   default = 8080
 }
 
+variable "enable_artifact_registry" {
+  description = "Create the Artifact Registry repository infra-cloud-template. ONE env per project creates it (dev by default); a second one would fail with 409 already exists."
+  type        = bool
+  default     = false
+}
+
+variable "enable_vm" {
+  description = "Create the VM + data disk of classes 1-2."
+  type        = bool
+  default     = false
+}
+
 variable "enable_gke" {
-  description = "Prod runs the class-8 integrator case, which needs GKE."
+  description = "Create the GKE cluster (class 5 onward). It costs money while it exists: destroy it after class."
   type        = bool
   default     = true
 }
