@@ -32,11 +32,31 @@ def client(trained_model, monkeypatch):
 
     if already_imported:
         importlib.reload(serve_module)
-    return TestClient(serve_module.app)
+    with TestClient(serve_module.app) as test_client:  # runs the startup hook
+        yield test_client
 
 
 def test_healthz(client):
-    assert client.get("/healthz").json() == {"status": "ok"}
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+def test_healthz_is_503_without_a_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_PATH", str(tmp_path / "missing.joblib"))
+    import importlib
+
+    import serve as serve_module
+
+    importlib.reload(serve_module)
+    with TestClient(serve_module.app) as c:
+        assert c.get("/healthz").status_code == 503
+        r = c.post("/predict", json={"features": [5.1, 3.5, 1.4, 0.2]})
+        assert r.status_code == 503
+
+
+def test_index_lists_endpoints(client):
+    assert "POST /predict" in client.get("/").json()["endpoints"]
 
 
 def test_predict_returns_class_and_confidence(client):
