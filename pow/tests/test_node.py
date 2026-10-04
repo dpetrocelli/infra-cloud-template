@@ -48,3 +48,36 @@ def test_metrics_reports_block_height(client):
     assert "pow_block_height" in m
     assert "pow_mining_seconds" in m
     assert "pow_peers" in m
+
+
+def test_concurrent_tx_and_mine_keep_the_chain_valid(client):
+    """Regression test: /tx during /mine used to change a block after it was
+    hashed, and concurrent /mine calls overwrote each other's blocks."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from blockchain import Block, validate_chain
+
+    def send_tx(i):
+        return client.post("/tx", json={"sender": f"u{i}", "to": "sink", "amount": 1})
+
+    def do_mine(_):
+        return client.post("/mine")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        tx_futures = [pool.submit(send_tx, i) for i in range(60)]
+        mine_futures = [pool.submit(do_mine, i) for i in range(10)]
+        results = [f.result() for f in tx_futures + mine_futures]
+
+    assert all(r.status_code in (200, 201) for r in results)
+    chain = [Block.from_dict(b) for b in client.get("/chain").json()]
+    ok, reason = validate_chain(chain)
+    assert ok, reason
+    assert len(chain) == 11  # genesis + one block per /mine, none lost
+
+    mined_tx = sum(
+        1
+        for b in chain[1:]
+        for t in b.transactions
+        if t.get("sender", "").startswith("u")
+    )
+    assert mined_tx + len(client.get("/tx").json()) == 60  # no tx lost or duplicated
