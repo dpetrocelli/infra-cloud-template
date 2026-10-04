@@ -25,3 +25,9 @@ variable "ssh_source_ranges" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "extra_ports" {
+  description = "More TCP ports to open to the internet on app-server VMs, e.g. [8081] for the model or [8545] for Anvil. Prefer an SSH tunnel for anything that is not a demo."
+  type        = list(number)
+  default     = []
+}
