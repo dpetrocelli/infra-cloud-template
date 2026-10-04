@@ -17,7 +17,10 @@ K6_IMAGE      ?= grafana/k6:2.3.0
 # disk-pressure taint)? Free space first; as a last resort use:
 #   make k3d-up K3D_ARGS="--k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<2%,nodefs.available<2%@all'"
 K3D_ARGS      ?=
-CHARTS        := servicio-patron anvil pow model
+# Charts and images are discovered from the tree, so removing a folder
+# (for example model/ or pow/) does not break these targets.
+CHARTS        := $(notdir $(wildcard helm/charts/*))
+IMAGES        := $(foreach d,app model pow,$(if $(wildcard $(d)/Dockerfile),$(d))) anvil-exporter
 TF_ROOTS      := envs/dev envs/prod modules/network modules/vm modules/artifact-registry modules/gke
 PYTEST        := uv run --python $(PYTHON) --with-requirements requirements.txt --with pytest --with httpx pytest -q
 
@@ -40,10 +43,10 @@ test-app: ## pytest of the servicio patron (class 1)
 	cd app && $(PYTEST)
 
 test-model: ## pytest of the IA model server
-	cd model && $(PYTEST)
+	@if [ -d model ]; then cd model && $(PYTEST); else echo "skip: no model/ folder"; fi
 
 test-pow: ## pytest of the PoW node
-	cd pow && $(PYTEST)
+	@if [ -d pow ]; then cd pow && $(PYTEST); else echo "skip: no pow/ folder"; fi
 
 test-exporter: ## pytest of the Anvil exporter (class 6)
 	cd observability/anvil-exporter && $(PYTEST)
@@ -58,7 +61,7 @@ test-contracts: ## forge test (uses the Foundry docker image if forge is not ins
 	fi
 
 # --- images ------------------------------------------------------------------
-build: build-app build-model build-pow build-exporter ## docker build of every image (tag TAG, default local)
+build: $(addprefix build-,$(filter-out anvil-exporter,$(IMAGES))) build-exporter ## docker build of every image (tag TAG, default local)
 
 build-app: ## app:TAG (servicio patron)
 	docker build -t app:$(TAG) ./app
@@ -119,7 +122,7 @@ k3d-up: ## local Kubernetes (k3s in docker), 1 server + 1 agent
 	k3d cluster create $(K3D_CLUSTER) --agents 1 --wait $(K3D_ARGS)
 
 k3d-images: build ## build and copy the images into the k3d cluster
-	k3d image import app:$(TAG) model:$(TAG) pow:$(TAG) anvil-exporter:$(TAG) -c $(K3D_CLUSTER)
+	k3d image import $(addsuffix :$(TAG),$(IMAGES)) -c $(K3D_CLUSTER)
 
 k3d-down: ## delete the local cluster (and its volumes)
 	k3d cluster delete $(K3D_CLUSTER)
