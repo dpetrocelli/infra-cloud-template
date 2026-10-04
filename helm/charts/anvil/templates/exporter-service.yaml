@@ -8,6 +8,7 @@ metadata:
   name: {{ include "anvil.fullname" . }}-exporter
   labels:
     app: anvil-exporter
+    app.kubernetes.io/name: anvil-exporter
 spec:
   selector:
     app: {{ include "anvil.fullname" . }}

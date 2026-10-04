@@ -2,5 +2,5 @@ apiVersion: v2
 name: pow
 description: Class 8 (BC integrator case) - N PoW node replicas peered over a headless service.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "1.0.0"

@@ -7,7 +7,12 @@ metadata:
   labels:
     app: {{ include "model.fullname" . }}
 spec:
+  {{- if not .Values.autoscaling.enabled }}
+  # With the HPA on, the HPA owns spec.replicas: setting it here would make
+  # every `helm upgrade` reset the replicas the HPA chose. A fresh install
+  # starts with 1 pod and the HPA raises it to minReplicas within seconds.
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ include "model.fullname" . }}

@@ -6,7 +6,12 @@ metadata:
     app: {{ include "pow.fullname" . }}
 spec:
   serviceName: {{ include "pow.fullname" . }}-headless
+  {{- if not .Values.autoscaling.enabled }}
+  # With the HPA on, the HPA owns spec.replicas: setting it here would make
+  # every `helm upgrade` reset the replicas the HPA chose. A fresh install
+  # starts with 1 pod and the HPA raises it to minReplicas within seconds.
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ include "pow.fullname" . }}
@@ -31,8 +36,13 @@ spec:
             # Every peer's stable DNS name via the headless service. Includes
             # self, which is harmless: /peers/sync just compares its own
             # chain against itself as one of the candidates.
+            # Sized to maxReplicas when the HPA is on, so the pods it adds later
+            # (pow-3, pow-4, ...) are peers too. Peers that do not exist yet are
+            # skipped by /peers/sync, so GET /peers lists maxReplicas URLs and
+            # the pow_peers gauge reports that number, not the live pods.
+            {{- $n := ternary .Values.autoscaling.maxReplicas .Values.replicaCount .Values.autoscaling.enabled }}
             - name: PEERS
-              value: {{ range $i := until (int .Values.replicaCount) }}http://{{ include "pow.fullname" $ }}-{{ $i }}.{{ include "pow.fullname" $ }}-headless:{{ $.Values.service.port }},{{ end }}
+              value: {{ range $i := until (int $n) }}http://{{ include "pow.fullname" $ }}-{{ $i }}.{{ include "pow.fullname" $ }}-headless:{{ $.Values.service.port }},{{ end }}
           volumeMounts:
             - name: data
               mountPath: /data
@@ -53,7 +63,9 @@ spec:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: {{ .Values.persistence.storageClassName }}
+        {{- with .Values.persistence.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
         resources:
           requests:
             storage: {{ .Values.persistence.size }}

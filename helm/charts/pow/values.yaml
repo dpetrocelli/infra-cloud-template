@@ -1,8 +1,15 @@
+# Default values for the pow chart (BC track, class 8), written for GKE.
+#   GKE:        --set image.repository=$AR/pow --set image.tag=<sha or vX.Y.Z>
+#   k3s / k3d:  -f helm/charts/pow/values-k3s.yaml
+# Install it with the release name "pow" so the DNS names are pow-0.pow-headless, ...
 image:
+  # Artifact Registry path: <REGION>-docker.pkg.dev/<PROJECT_ID>/infra-cloud-template/pow
   repository: pow
-  tag: latest
+  tag: v1
   pullPolicy: IfNotPresent
 
+# Only used when autoscaling.enabled=false (with the HPA on, the HPA decides
+# and PEERS lists autoscaling.maxReplicas nodes).
 replicaCount: 3
 
 service:
@@ -10,7 +17,11 @@ service:
 
 persistence:
   size: 512Mi
-  storageClassName: standard
+  # "" = the cluster's default StorageClass (GKE: standard-rwo, k3s: local-path).
+  # Changing it (or PEERS) on an existing release fails with "updates to
+  # statefulset spec ... are forbidden": helm uninstall pow, kubectl delete pvc
+  # -l app=pow, install again.
+  storageClassName: ""
 
 difficulty: 4
 

@@ -1,5 +1,6 @@
 # Same lesson as the class-1 VM demo, on Kubernetes: the pod is disposable,
 # /state/anvil-state.json on the PVC is the source of truth.
+# Anvil is a single dev node: replicas stays at 1 on purpose.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -17,6 +18,10 @@ spec:
       labels:
         app: {{ include "anvil.fullname" . }}
     spec:
+      securityContext:
+        # Anvil runs as uid 1000. Without fsGroup a root-owned volume cannot be
+        # written and the chain silently resets on every restart.
+        fsGroup: 1000
       containers:
         - name: anvil
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -25,10 +30,19 @@ spec:
           args:
             - "--host"
             - "0.0.0.0"
+            # Load this file at start and write it back on a clean stop...
             - "--state"
             - "/state/anvil-state.json"
+            # ...and ALSO every N seconds, so an OOM kill or a node crash loses
+            # at most N seconds of blocks.
+            - "--state-interval"
+            - "{{ .Values.stateInterval }}"
           ports:
             - containerPort: {{ .Values.service.port }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 2
           volumeMounts:
             - name: state
               mountPath: /state
@@ -49,7 +63,9 @@ spec:
         name: state
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: {{ .Values.persistence.storageClassName }}
+        {{- with .Values.persistence.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
         resources:
           requests:
             storage: {{ .Values.persistence.size }}
