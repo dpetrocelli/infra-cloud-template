@@ -11,7 +11,7 @@ Al terminar tenés:
 
 1. Un cluster local con las imágenes del repo adentro.
 2. `servicio-patron` instalado con Helm, con su PVC `Bound`, y la prueba de que el contador sobrevive a `kubectl delete pod`.
-3. BC: Anvil como StatefulSet conservando la cadena. IA: el modelo como Deployment con HPA, upgrade y rollback.
+3. La pista de tu diplomatura: [docs/bc/clase-05.md](bc/clase-05.md) o [docs/ia/clase-05.md](ia/clase-05.md).
 4. (En la nube) lo mismo en GKE con la imagen de Artifact Registry.
 
 ## Prerrequisitos
@@ -40,7 +40,7 @@ agrega el contexto `k3d-infra-cloud` a tu `~/.kube/config` y lo deja activo.
 k3s no ve las imágenes de tu Docker: hay que copiarlas al cluster.
 
 ```bash
-make k3d-images        # make build + k3d image import app:local model:local pow:local anvil-exporter:local
+make k3d-images        # make build + k3d image import of every local image
 ```
 
 ### 3. Revisá los charts antes de instalar
@@ -120,54 +120,6 @@ kubectl get pods,pvc -l app=servicio-patron     # servicio-patron-0/-1 y data-se
 Con el HPA prendido, `replicaCount` no se usa: las réplicas las decide el HPA,
 y el chart no pisa esa decisión en cada `helm upgrade`.
 
-## Pista BC: Anvil como StatefulSet
-
-```bash
-helm upgrade --install anvil helm/charts/anvil -f helm/charts/anvil/values-k3s.yaml --wait
-kubectl logs anvil-0 | sed -n '/Available Accounts/,/Wallet/p' | head -8   # cuentas y claves de prueba
-KEY0=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-ACC1=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-kubectl exec anvil-0 -- cast send --private-key $KEY0 --value 1ether $ACC1
-kubectl exec anvil-0 -- cast block-number                  # 1
-kubectl delete pod anvil-0 && kubectl wait --for=condition=Ready pod/anvil-0 --timeout=120s
-kubectl exec anvil-0 -- cast block-number                  # sigue en 1
-kubectl exec anvil-0 -- cast balance $ACC1 --ether         # 10001
-```
-
-`cast` viene en la imagen de Foundry, así que corre adentro del pod: no hace
-falta instalar nada. El chart pone `fsGroup: 1000` (Anvil no corre como root) y
-`--state-interval 5`: aunque el pod muera de golpe (OOM, nodo caído) se pierden
-a lo sumo 5 segundos. Lo probamos con `kubectl delete pod anvil-0 --grace-period=0 --force`.
-
-El nodo PoW (`helm/charts/pow`) es la **línea base** de tu TF: un StatefulSet
-con un PVC por nodo y un Service headless, para que cada pod tenga un nombre
-DNS estable (`pow-0.pow-headless`). Si querés mirarlo hoy:
-`helm upgrade --install pow helm/charts/pow -f helm/charts/pow/values-k3s.yaml --wait`
-y `kubectl get pods,pvc -l app=pow` (1 pod, 1 PVC). Con `--set replicaCount=3`
-levantás 3 nodos, pero cada uno con **su propia** cadena: que se sincronicen es
-el trabajo del TF.
-
-## Pista IA: el modelo como Deployment con HPA
-
-El modelo no tiene estado propio (los pesos están en la imagen), así que es un
-Deployment sin PVC.
-
-```bash
-helm upgrade --install model helm/charts/model -f helm/charts/model/values-k3s.yaml --wait
-kubectl get deploy,hpa model          # el HPA lo sube a 2 réplicas en unos segundos
-kubectl port-forward svc/model 18081:8081     # en otra terminal
-curl -s -X POST localhost:18081/predict -H 'Content-Type: application/json' -d '{"features":[5.1,3.5,1.4,0.2]}'; echo
-```
-
-Upgrade y rollback:
-
-```bash
-helm upgrade model helm/charts/model -f helm/charts/model/values-k3s.yaml --set autoscaling.minReplicas=3 --wait
-kubectl get hpa model                 # MINPODS 3
-helm history model
-helm rollback model 1 --wait
-```
-
 Cuando un chart cambia entre clases, usá `-f` con los mismos valores (como
 arriba) o `--reset-then-reuse-values`; `--reuse-values` solo ignora las claves
 nuevas del chart.
@@ -187,16 +139,13 @@ nuevas del chart.
 > kubectl get pvc     # StorageClass standard-rwo (un Persistent Disk)
 > ```
 >
-> BC: `helm upgrade --install anvil helm/charts/anvil --wait` (la imagen es pública).
-> IA: `helm upgrade --install model helm/charts/model --set image.repository="$AR/model" --set image.tag=v1 --wait`.
->
 > Al terminar: `helm uninstall ...`, `kubectl delete pvc --all` y
 > `enable_gke = false` + `tofu apply` para borrar el cluster.
 
 ## Limpieza
 
 ```bash
-helm uninstall --ignore-not-found servicio-patron anvil model pow
+helm uninstall --ignore-not-found servicio-patron
 kubectl get pvc                 # los PVC NO se borran con helm uninstall (a propósito)
 kubectl delete pvc --all        # ahora sí se pierden los datos
 make k3d-down                   # borra el cluster entero
@@ -207,7 +156,7 @@ make k3d-down                   # borra el cluster entero
 | Si ves | Causa | Hacé |
 |---|---|---|
 | Pod y PVC en `Pending`, y `kubectl describe pvc` dice `storageclass "standard" not found` | Instalaste con valores de GKE en k3s | `helm uninstall`, `kubectl delete pvc -l app=<chart>` e instalá con `-f values-k3s.yaml` |
-| `UPGRADE FAILED: ... updates to statefulset spec for fields other than 'replicas' ... are forbidden` | Cambiaste la StorageClass, el tamaño o `PEERS` de un StatefulSet existente | `helm uninstall <release>`, `kubectl delete pvc -l app=<release>` y reinstalá |
+| `UPGRADE FAILED: ... updates to statefulset spec for fields other than 'replicas' ... are forbidden` | Cambiaste la StorageClass, el tamaño del volumen u otro campo fijo de un StatefulSet existente | `helm uninstall <release>`, `kubectl delete pvc -l app=<release>` y reinstalá |
 | `ErrImageNeverPull` | La imagen `:local` no está en el cluster | `make k3d-images` |
 | `ErrImagePull` / `ImagePullBackOff` en GKE | `image.repository` o el tag no existen en Artifact Registry | `--set image.repository=$AR/app --set image.tag=v1`; revisá `gcloud artifacts docker images list $AR` |
 | Pods `Pending` con `node(s) had untolerated taint {node.kubernetes.io/disk-pressure}` | Disco de tu máquina casi lleno | `docker system prune`; como último recurso, recreá el cluster con el `K3D_ARGS` que explica el `Makefile` |
