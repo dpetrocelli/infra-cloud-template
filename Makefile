@@ -51,13 +51,13 @@ test-pow: ## pytest of the PoW baseline node
 test-exporter: ## pytest of the Anvil exporter (class 6)
 	cd observability/anvil-exporter && $(PYTEST)
 
-test-contracts: ## forge test (uses the Foundry docker image if forge is not installed)
+test-contracts: ## forge fmt --check + forge test, like contracts.yml (Foundry docker image if forge is not installed)
 	@if command -v forge >/dev/null 2>&1; then \
-	  cd contracts && forge test -vv; \
+	  cd contracts && forge fmt --check && forge test -vv; \
 	else \
 	  echo "forge not found: using $(FOUNDRY_IMAGE)"; \
 	  docker run --rm -u "$$(id -u):$$(id -g)" -e HOME=/tmp -v "$$PWD:/w" -w /w/contracts \
-	    --entrypoint forge $(FOUNDRY_IMAGE) test -vv; \
+	    --entrypoint sh $(FOUNDRY_IMAGE) -c 'forge fmt --check && forge test -vv'; \
 	fi
 
 # --- images ------------------------------------------------------------------
