@@ -11,9 +11,9 @@
 # REPOSITORY VARIABLES (Settings > Secrets and variables > Actions > Variables).
 # They are identifiers, not secrets. Until GCP_PROJECT_ID exists the publish
 # job is SKIPPED (grey), so a fresh copy of the template stays green.
-#   GCP_PROJECT_ID                  e.g. "unlu-ia-perez"
+#   GCP_PROJECT_ID                  e.g. "mi-proyecto-123"
 #   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<NUMBER>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
-#   GCP_SERVICE_ACCOUNT             e.g. "ci-artifact-writer@unlu-ia-perez.iam.gserviceaccount.com"
+#   GCP_SERVICE_ACCOUNT             e.g. "ci-artifact-writer@mi-proyecto-123.iam.gserviceaccount.com"
 #   GCP_REGION                      optional, default southamerica-east1
 #   AR_REPOSITORY                   optional, default infra-cloud-template
 name: ci
