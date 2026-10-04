@@ -4,8 +4,9 @@ Repo template de la cátedra (2026). Trae el **servicio patrón** y todo lo que
 hace falta para llevarlo de tu laptop a producción a lo largo de las 8 clases:
 contenedores, IaC, CI/CD, Kubernetes y observabilidad. Cada estudiante lo
 instancia y le suma su propio artefacto. Hay dos pistas de ejemplo: **IA**
-(servidor de inferencia) y **BC** (Blockchain: Anvil, contratos y una
-mini-blockchain PoW).
+(servidor de inferencia) y **BC** (Blockchain: Anvil, contratos y la **línea
+base** de una mini-blockchain PoW, de un solo nodo, que extendés en tu Trabajo
+Final).
 
 No hace falta entender todo el repo el día 1: cada clase usa una carpeta
 puntual. Arrancá por la sección "Primeros 10 minutos" y después seguí la guía
@@ -104,8 +105,12 @@ app/                 servicio patrón (FastAPI): GET /, /healthz, /metrics,
                      POST /items y GET /items. Estado en /data.
 model/               (IA) servidor de inferencia: POST /predict. El modelo
                      (iris) se entrena al construir la imagen.
-pow/                 (BC) nodo de una mini-blockchain de prueba de trabajo:
-                     /chain /tx /mine /peers /peers/sync.
+pow/                 (BC) LÍNEA BASE de un nodo PoW (corre como un nodo):
+                     /healthz /metrics /chain /tx /mine, dificultad fija,
+                     cadena en /data. Lo que falta (peers, /peers/sync,
+                     validar cadenas, consenso, dificultad ajustable, reglas
+                     del mempool, concurrencia) está marcado TODO(TF): es tu
+                     Trabajo Final.
 contracts/           (BC) proyecto Foundry: contrato Counter + tests.
 compose/             docker-compose.yml (servicio patrón) y
                      docker-compose.anvil.yml (Anvil + servicio patrón).
@@ -151,6 +156,24 @@ Tags de las imágenes:
 
 Instalá los charts con el **nombre de release** de la tabla: los nombres DNS,
 los dashboards y las guías asumen esos nombres.
+
+## BC: la línea base PoW es el punto de partida de tu TF
+
+El Trabajo Final de BC es **tu propia blockchain PoW con varios nodos, en
+producción en la nube**. `pow/` y `helm/charts/pow` no son esa blockchain:
+son la línea base de la que partís.
+
+| Ya está (no lo tenés que escribir) | Es tu TF (marcado `TODO(TF)` en el código) |
+|---|---|
+| `Block`, hash sha256, bloque génesis | dificultad ajustable |
+| cadena en JSON en `/data` (sobrevive al pod) | validar una cadena que llega de otro nodo |
+| `POST /mine` con un loop de dificultad fija | peers: `GET /peers` y `POST /peers/sync` |
+| `/healthz`, `/metrics` (`pow_block_height`), `/chain`, `/tx` en el puerto 8090 | consenso: la cadena más larga y válida gana |
+| chart con StatefulSet, un PVC por nodo, Service headless y `PEERS` | reglas del mempool y seguridad ante concurrencia |
+
+Los tests de `pow/tests/` que están en `skip` son la pista: cuando implementes
+cada parte, sacales el `skip`. Con `replicaCount: 3` hoy tenés tres cadenas
+**independientes**; que converjan es tu trabajo (al menos 2 nodos sincronizando).
 
 ## Comandos útiles
 
@@ -202,7 +225,7 @@ make k3d-up && make k3d-images   # cluster local con las imágenes adentro
 - Código y comentarios en inglés. Documentación y este README en español
   rioplatense.
 - Variables de entorno, nunca valores hardcodeados: `DATA_DIR`, `PORT`,
-  `DIFFICULTY`, `PEERS`, `MODEL_PATH`, etc. Los defaults están en el
+  `PEERS`, `MODEL_PATH`, etc. Los defaults están en el
   `Dockerfile` de cada servicio.
 - Ningún archivo contiene credenciales. Lo que necesita CI/CD (project id,
   proveedor de Workload Identity, cuenta de servicio) es una **variable de

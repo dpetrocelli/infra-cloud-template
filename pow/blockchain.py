@@ -1,8 +1,14 @@
-"""Minimal proof-of-work blockchain, adapted from the SDyPP 2026 clase-11
-lab (same hashing/difficulty rule) for the class-8 BC integrator case.
+"""Mini proof-of-work blockchain: the BASELINE you extend into your TF (BC).
 
-Standard library only. Deliberately small: read it once, then extend it in
-the TPI (see contracts/ and the BC "Curso 3 - TPI.3" PoW spec).
+What is already here (read it once, it is short):
+  - Block: the data of one block and its sha256 hash.
+  - genesis(): the first block, the same on every node.
+  - mine(): the simplest PoW loop there is, with a FIXED difficulty.
+  - new_block(): the next block on top of a chain.
+
+What is NOT here: everything marked TODO(TF). That is your Trabajo Final:
+a PoW blockchain of your own, with several nodes, running in the cloud.
+Standard library only.
 """
 
 from __future__ import annotations
@@ -14,23 +20,29 @@ from dataclasses import asdict, dataclass, field
 
 GENESIS_PREV = "0" * 64
 
+# Leading hex zeros a block hash needs. FIXED on purpose: 3 zeros = about
+# 4096 attempts, a few milliseconds on a laptop.
+# TODO(TF): adjustable difficulty. Decide where it comes from (config, the
+# chain itself, a retarget rule from the time between blocks...) and make
+# every node agree on it.
+DIFFICULTY = 3
+
 
 @dataclass
 class Block:
     index: int
     previous_hash: str
     transactions: list[dict]
-    difficulty: int
     timestamp: float = field(default_factory=time.time)
     nonce: int = 0
     hash: str = ""
 
     def header(self) -> str:
+        """Everything the hash covers except the nonce, as canonical JSON."""
         payload = {
             "index": self.index,
             "previous_hash": self.previous_hash,
             "transactions": self.transactions,
-            "difficulty": self.difficulty,
             "timestamp": self.timestamp,
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -47,82 +59,40 @@ class Block:
         return cls(**data)
 
 
-def meets_difficulty(block_hash: str, difficulty: int) -> bool:
-    """Difficulty = number of required leading hex zeros."""
-    return block_hash.startswith("0" * difficulty)
-
-
-def mine(block: Block, max_attempts: int = 5_000_000) -> tuple[int, int]:
-    """Brute-force the nonce. Returns (nonce, attempts)."""
-    header = block.header()
-    target = "0" * block.difficulty
-    nonce = 0
-    while nonce < max_attempts:
-        h = hashlib.sha256(f"{header}{nonce}".encode()).hexdigest()
+def mine(block: Block) -> Block:
+    """Try nonces 0, 1, 2, ... until the hash starts with DIFFICULTY zeros."""
+    target = "0" * DIFFICULTY
+    while True:
+        h = block.compute_hash()
         if h.startswith(target):
-            block.nonce, block.hash = nonce, h
-            return nonce, nonce + 1
-        nonce += 1
-    raise ValueError(f"no nonce found within {max_attempts} attempts")
+            block.hash = h
+            return block
+        block.nonce += 1
 
 
-def genesis(difficulty: int = 1) -> Block:
-    b = Block(
-        0,
-        GENESIS_PREV,
-        [{"msg": "genesis catedra infra-cloud"}],
-        difficulty,
-        timestamp=0.0,
-    )
-    mine(b)
-    return b
+def genesis() -> Block:
+    """Block 0. Fixed timestamp, so every node computes the same genesis."""
+    return mine(Block(0, GENESIS_PREV, [{"msg": "genesis infra-cloud"}], timestamp=0.0))
 
 
-def new_block(chain: list[Block], transactions: list[dict], difficulty: int) -> Block:
+def new_block(chain: list[Block], transactions: list[dict]) -> Block:
     last = chain[-1]
-    return Block(last.index + 1, last.hash, transactions, difficulty)
+    return Block(last.index + 1, last.hash, transactions)
 
 
 def validate_chain(chain: list[Block]) -> tuple[bool, str]:
-    """Re-validate every block. Never trust a chain that arrived over the network."""
-    if not chain:
-        return False, "empty chain"
-    if chain[0].previous_hash != GENESIS_PREV:
-        return False, "bad genesis previous_hash"
+    """TODO(TF): validate a chain you RECEIVED from another node.
 
-    for i, b in enumerate(chain):
-        if b.index != i:
-            return False, f"block {i}: bad index {b.index}"
-        if i > 0 and b.previous_hash != chain[i - 1].hash:
-            return False, f"block {i}: previous_hash does not match block {i - 1}"
-        expected_hash = b.compute_hash()
-        if expected_hash != b.hash:
-            return False, f"block {i}: stored hash does not match recomputed hash"
-        if not meets_difficulty(b.hash, b.difficulty):
-            return False, f"block {i}: hash does not meet its own difficulty"
-    return True, "ok"
-
-
-def chain_work(chain: list[Block]) -> int:
-    """Cumulative 'work' proxy used to pick the longest VALID chain.
-
-    Real chains sum actual hash-power; here, for teaching purposes, work is
-    approximated as 16**difficulty per block (more leading zeros == harder).
+    Never trust a chain that arrived over the network. Think about: the
+    genesis, the indexes, previous_hash links, recomputing every hash and the
+    difficulty each block claims. Return (ok, reason).
     """
-    return sum(16**b.difficulty for b in chain)
+    raise NotImplementedError("TODO(TF): validate a received chain")
 
 
 def choose_best_chain(candidates: list[list[Block]]) -> list[Block] | None:
-    """Longest-valid-chain rule: among all VALID candidates, keep the one
-    with the most cumulative work (ties broken by chain length)."""
-    best = None
-    best_score = (-1, -1)
-    for candidate in candidates:
-        ok, _ = validate_chain(candidate)
-        if not ok:
-            continue
-        score = (chain_work(candidate), len(candidate))
-        if score > best_score:
-            best_score = score
-            best = candidate
-    return best
+    """TODO(TF): consensus. Among the VALID candidates (yours + your peers'),
+    pick the one every node should keep: the longest valid chain (or the one
+    with the most accumulated work). What happens on a tie?
+    """
+    raise NotImplementedError("TODO(TF): longest-valid-chain consensus")

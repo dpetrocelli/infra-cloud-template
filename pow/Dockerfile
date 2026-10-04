@@ -10,7 +10,7 @@ COPY blockchain.py node.py .
 RUN mkdir -p /data
 
 EXPOSE 8090
-ENV DATA_DIR=/data PORT=8090 DIFFICULTY=4 PEERS=""
+ENV DATA_DIR=/data PORT=8090 PEERS=""
 
 # `docker ps` shows (healthy) once /healthz answers. Kubernetes ignores this
 # and uses the chart's probes instead.

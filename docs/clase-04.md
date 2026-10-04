@@ -26,7 +26,7 @@ Al terminar tenés:
 ### 1. Lo mismo que corre CI, en tu laptop
 
 ```bash
-make test        # app 4, model 6, pow 10, exporter 3 y forge 5 tests
+make test        # app 4, model 6, pow 8 (+2 en skip: TODO del TF), exporter 3 y forge 5 tests
 make build
 ```
 

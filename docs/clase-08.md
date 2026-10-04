@@ -18,7 +18,8 @@ Run workflow "deploy" (image_tag=<sha>) ─> terraform ─> GKE ─> helm upgrad
 Al terminar tenés:
 
 1. Un **ensayo completo en tu laptop** (k3d): despliegue, verificación, carga y escalado.
-2. BC: una red de nodos PoW que mina y converge. IA: el modelo escalando de 2 a más réplicas.
+2. BC: la **línea base** del nodo PoW desplegada (minando, con su cadena en un PVC) y el plan
+   de cómo la extendés a tu red. IA: el modelo escalando de 2 a más réplicas.
 3. (En la nube) el mismo flujo con `deploy.yml` contra GKE.
 
 ## Prerrequisitos
@@ -43,11 +44,11 @@ ServiceMonitors y dashboards). Loki es opcional hoy.
 
 ### 3. Desplegá tu pista
 
-BC:
+BC (la línea base, un nodo):
 
 ```bash
 helm upgrade --install pow helm/charts/pow -f helm/charts/pow/values-k3s.yaml --wait
-kubectl get pods,pvc,hpa -l app=pow -w      # Ctrl+C cuando haya 3 pods Running
+kubectl get pods,pvc -l app=pow             # pow-0 Running y su PVC data-pow-0 Bound
 ```
 
 IA:
@@ -57,36 +58,40 @@ helm upgrade --install model helm/charts/model -f helm/charts/model/values-k3s.y
 kubectl get deploy,hpa model -w             # Ctrl+C cuando haya 2 réplicas
 ```
 
-Sin el HPA el chart pondría las réplicas fijas; con el HPA prendido no las
+IA: sin el HPA el chart pondría las réplicas fijas; con el HPA prendido no las
 pone (si no, cada `helm upgrade` pisaría lo que decidió el HPA). Por eso una
 instalación nueva arranca con **1 pod** y en unos segundos el HPA la lleva a
-`minReplicas` (3 para pow, 2 para model). `helm --wait` vuelve antes: esperá con
-el `-w`.
+`minReplicas` (2). `helm --wait` vuelve antes: esperá con el `-w`.
+
+BC: el chart de `pow` no trae HPA. La línea base es un solo nodo y escalar
+nodos que no se sincronizan solo crea cadenas sueltas. Si tu red escala sola,
+y cómo, es una decisión de diseño de tu TF.
 
 ### 4. Verificá
 
-BC, la red de nodos:
+BC, la línea base:
 
 ```bash
 kubectl port-forward pod/pow-0 18090:8090    # otra terminal
-curl -s localhost:18090/peers; echo
+curl -s localhost:18090/healthz; echo
 curl -s -X POST localhost:18090/tx -H 'Content-Type: application/json' -d '{"sender":"ana","to":"beto","amount":1}'; echo
 curl -s -X POST localhost:18090/mine | head -c 200; echo
-for p in pow-1 pow-2; do
-  kubectl exec $p -- python -c "import urllib.request as u; print(u.urlopen(u.Request('http://localhost:8090/peers/sync', method='POST')).read().decode())"
-done
+curl -s localhost:18090/chain | python3 -c 'import json,sys; c=json.load(sys.stdin); print(len(c)-1, c[-1]["hash"])'
+curl -s localhost:18090/metrics | grep '^pow_block_height'
 ```
 
-Esperado: `/peers` lista **6** URLs (`pow-0` … `pow-5`): la lista se arma para
-`maxReplicas` del HPA, así los nodos que agregue después también son peers. Los
-que todavía no existen se saltean en el sync, y la métrica `pow_peers` muestra
-6 (configurados, no vivos). Cada sync responde `{"replaced":true,"height":1,...}`:
-`pow-1` y `pow-2` adoptan la cadena de `pow-0` (la de más trabajo acumulado y válida).
+Esperado: `/mine` devuelve el bloque 1 con un hash que empieza con `000`
+(dificultad fija), `/chain` tiene altura 1 y `pow_block_height` vale 1. Borrá el
+pod (`kubectl delete pod pow-0`): vuelve con la misma cadena, porque vive en el PVC.
 
-Los bloques **no se propagan solos**: cada nodo se entera cuando corre
-`/peers/sync`. Si dos nodos minaron cadenas distintas del mismo largo, ninguna
-gana (empate) hasta que alguien mine un bloque más; para converger, miná uno en
-un nodo y sincronizá los demás.
+**De acá en adelante es tu TF.** Lo que falta está marcado `TODO(TF)` en
+`pow/blockchain.py` y `pow/node.py`: dificultad ajustable, validar la cadena
+que llega de otro nodo, peers (`GET /peers`, `POST /peers/sync`), consenso por
+la cadena más larga y válida, reglas del mempool y seguridad ante concurrencia.
+El chart ya te da lo de infraestructura: `--set replicaCount=3` levanta
+`pow-0..2`, cada uno con su disco y su nombre DNS estable, y les pasa la lista
+en la variable `PEERS`. Hoy son tres cadenas independientes; el mínimo del TF es
+**al menos 2 nodos que sincronizan**, en la nube.
 
 IA, el modelo:
 
@@ -107,20 +112,21 @@ kubectl apply -f loadtest/k6-job.yaml
 kubectl get hpa -w
 ```
 
-`loadtest/k6-job.yaml` viene con `TARGET=model` y `SLEEP=0.05`. Para pow,
-editá el archivo: `TARGET=pow` y `SLEEP=1` (cada nodo mina con CPU, alcanza).
+`loadtest/k6-job.yaml` viene con `TARGET=model` y `SLEEP=0.05`. Para BC el
+script no trae un escenario de `pow`: cuando tu red funcione, sumá uno que
+ejercite tus endpoints (por ejemplo `POST /tx` y, cada tanto, `POST /mine`).
 
 Esperado para el modelo: las réplicas pasan de 2 a 4 o más en uno o dos
 minutos (lo medimos: 2 → 4 → 6 → 8). Al terminar la carga bajan solas en unos 5
 minutos. En Grafana, `Model server` muestra la latencia y las réplicas, y
-`Mini PoW blockchain` la altura de cada nodo.
+`Mini PoW baseline` la altura de cada nodo (los paneles de tu red los agregás vos).
 
 `kubectl logs job/k6` muestra el resumen: `checks` cerca de 100% y
 `http_req_failed` debajo de 5%.
 
 ### 6. Un cambio y un nuevo deploy
 
-Hacé un cambio visible (BC: un campo nuevo en la respuesta de `/mine`; IA: un
+Hacé un cambio visible (BC: un campo nuevo en la respuesta de `/mine`, o tu primer `TODO(TF)`; IA: un
 `model_version` en la respuesta de `/predict`), corré `make test`, reconstruí y
 actualizá:
 
@@ -192,9 +198,10 @@ make k3d-down
 | Si ves | Causa | Hacé |
 |---|---|---|
 | PVC `Pending`, `storageclass "standard" not found` | Instalaste con los valores de GKE | `helm uninstall pow`, `kubectl delete pvc -l app=pow`, reinstalá con `-f values-k3s.yaml` |
-| `UPGRADE FAILED: ... updates to statefulset spec ... are forbidden` | Cambiaste StorageClass, tamaño o `PEERS` (p. ej. `maxReplicas`) de un release existente | `helm uninstall pow`, `kubectl delete pvc -l app=pow` y reinstalá |
+| `UPGRADE FAILED: ... updates to statefulset spec ... are forbidden` | Cambiaste StorageClass, tamaño o `PEERS` de un release existente | `helm uninstall pow`, `kubectl delete pvc -l app=pow` y reinstalá |
 | `422` en `POST /tx` | Falta `-H 'Content-Type: application/json'` o el campo es `sender` (no `from`) | Copiá el curl de arriba |
-| `{"replaced":false,...}` en todos los nodos | Empate entre cadenas del mismo largo | Miná un bloque en un nodo y volvé a sincronizar |
+| `404` en `/peers` o `/peers/sync` | La línea base no los trae | Es `TODO(TF)` en `pow/node.py` |
+| Con 3 réplicas cada nodo tiene otra altura | Sin `/peers/sync` no hay consenso | Es el corazón del TF |
 | `error: lost connection to pod` | El HPA borró el pod del port-forward al bajar réplicas | Relanzá el port-forward |
 | El HPA no pasa de 2 réplicas | Poca carga (k6 por port-forward o `SLEEP=1`) | El Job de k6 con `SLEEP=0.05` |
 | El HPA sube sin carga recién instalado | CPU del arranque | Esperá ~5 min antes de medir la línea base |

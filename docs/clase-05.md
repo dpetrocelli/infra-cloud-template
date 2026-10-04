@@ -139,9 +139,13 @@ falta instalar nada. El chart pone `fsGroup: 1000` (Anvil no corre como root) y
 `--state-interval 5`: aunque el pod muera de golpe (OOM, nodo caído) se pierden
 a lo sumo 5 segundos. Lo probamos con `kubectl delete pod anvil-0 --grace-period=0 --force`.
 
-El nodo PoW (`helm/charts/pow`) es el caso de la clase 8; si querés mirarlo hoy:
+El nodo PoW (`helm/charts/pow`) es la **línea base** de tu TF: un StatefulSet
+con un PVC por nodo y un Service headless, para que cada pod tenga un nombre
+DNS estable (`pow-0.pow-headless`). Si querés mirarlo hoy:
 `helm upgrade --install pow helm/charts/pow -f helm/charts/pow/values-k3s.yaml --wait`
-y `kubectl get pods -l app=pow -w` (arranca con 1 pod y el HPA lo sube a 3).
+y `kubectl get pods,pvc -l app=pow` (1 pod, 1 PVC). Con `--set replicaCount=3`
+levantás 3 nodos, pero cada uno con **su propia** cadena: que se sincronicen es
+el trabajo del TF.
 
 ## Pista IA: el modelo como Deployment con HPA
 

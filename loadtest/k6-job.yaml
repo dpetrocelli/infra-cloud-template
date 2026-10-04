@@ -23,14 +23,12 @@ spec:
           image: grafana/k6:2.3.0
           args: ["run", "/scripts/k6-script.js"]
           env:
-            - name: TARGET # model | pow | servicio-patron
+            - name: TARGET # model | servicio-patron
               value: model
-            - name: SLEEP # 0.05 for the model, 1 is fine for pow
+            - name: SLEEP # 0.05 for the model
               value: "0.05"
             - name: MODEL_URL
               value: http://model:8081
-            - name: POW_URL
-              value: http://pow:8090
             - name: SERVICIO_PATRON_URL
               value: http://servicio-patron:8080
           volumeMounts:

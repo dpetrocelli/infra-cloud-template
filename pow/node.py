@@ -1,62 +1,58 @@
-"""HTTP node for the mini PoW blockchain (class 8, BC integrator case).
+"""HTTP node of the mini PoW blockchain: the BASELINE you extend into your TF (BC).
 
-Endpoints:
-  - GET  /chain            -> full local chain, as JSON
-  - GET  /tx                -> pending tx pool
-  - POST /tx                -> {"sender": "...", "to": "...", "amount": 1} add tx to the pool
-  - POST /mine               -> mine a block with the pending pool, add it to our chain
-  - GET  /peers              -> configured peers
-  - POST /peers/sync          -> ask every peer for its chain, keep the best valid one
-  - GET  /metrics             -> Prometheus: block_height, peers, mining_seconds histogram
+It runs as ONE node and already answers the contract the course uses
+(port 8090, the same paths the chart, the ServiceMonitor and the docs expect):
+  - GET  /healthz   -> {"status": "ok"}
+  - GET  /metrics   -> Prometheus, with pow_block_height
+  - GET  /chain     -> the local chain, as JSON
+  - GET  /tx        -> the pending transactions
+  - POST /tx        -> {"sender": "ana", "to": "beto", "amount": 1}
+  - POST /mine      -> mine one block with the pending transactions
 
-State (chain + difficulty) persists under DATA_DIR (default /data), same
-convention as the servicio patron: kill the container, keep the disk.
+The chain is a JSON file under DATA_DIR (default /data): kill the container,
+keep the disk, keep the chain.
 
-Concurrency: FastAPI runs these sync endpoints in a thread pool, so the tx
-pool and chain.json are guarded by one lock and chain.json is replaced
-atomically. A /tx sent while this node mines waits until the block is done.
+TODO(TF), none of this is implemented. It is your Trabajo Final:
+  - Peers: PEERS (comma-separated URLs, the chart fills it in) is read below
+    but not used. Add GET /peers and POST /peers/sync: fetch the peers'
+    chains, validate them (blockchain.validate_chain) and keep the best one
+    (blockchain.choose_best_chain). Should a new block also be pushed to the
+    peers instead of waiting for a sync?
+  - Adjustable difficulty (blockchain.DIFFICULTY is a constant).
+  - Mempool rules: today ANY transaction is accepted (negative amounts,
+    duplicates, no signature, no balance check). Define what is valid.
+  - Concurrency: FastAPI runs these endpoints in a thread pool. Two /mine at
+    once, or a /tx while mining, can lose blocks or transactions, and
+    chain.json is not written atomically. Make it safe.
+  - More metrics for your dashboard (peers, mining time, ...).
 """
 
 from __future__ import annotations
 
 import json
 import os
-import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-import httpx
-from blockchain import (
-    Block,
-    chain_work,
-    choose_best_chain,
-    genesis,
-    mine,
-    new_block,
-)
-from fastapi import FastAPI, HTTPException
-from prometheus_client import CONTENT_TYPE_LATEST, Gauge, Histogram, generate_latest
+from blockchain import Block, genesis, mine, new_block
+from fastapi import FastAPI
+from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 from pydantic import BaseModel
 from starlette.responses import Response
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 CHAIN_FILE = DATA_DIR / "chain.json"
-DIFFICULTY = int(os.environ.get("DIFFICULTY", "4"))
-PEERS = [p.strip() for p in os.environ.get("PEERS", "").split(",") if p.strip()]
 PORT = int(os.environ.get("PORT", "8090"))
+# TODO(TF): use them (GET /peers, POST /peers/sync). Read here so the chart's
+# PEERS value already reaches the process.
+PEERS = [p.strip() for p in os.environ.get("PEERS", "").split(",") if p.strip()]
 
 BLOCK_HEIGHT = Gauge("pow_block_height", "Height of the local chain (last block index)")
-PEER_COUNT = Gauge("pow_peers", "Number of configured peers")
-MINING_SECONDS = Histogram(
-    "pow_mining_seconds", "Time spent mining a block, in seconds"
-)
 
-_pending_tx: list[dict[str, Any]] = []
-# One lock for chain file + tx pool: FastAPI runs sync endpoints in a thread
-# pool, so concurrent /tx and /mine calls would otherwise race.
-_lock = threading.Lock()
+# TODO(TF): mempool rules and concurrency safety (see the module docstring).
+pending_tx: list[dict[str, Any]] = []
 
 
 class Tx(BaseModel):
@@ -65,40 +61,26 @@ class Tx(BaseModel):
     amount: float
 
 
-def _load_chain() -> list[Block]:
+def load_chain() -> list[Block]:
     if CHAIN_FILE.exists():
-        raw = json.loads(CHAIN_FILE.read_text())
-        return [Block.from_dict(b) for b in raw]
-    genesis_block = genesis(DIFFICULTY)
-    chain = [genesis_block]
-    _save_chain(chain)
+        return [Block.from_dict(b) for b in json.loads(CHAIN_FILE.read_text())]
+    chain = [genesis()]
+    save_chain(chain)
     return chain
 
 
-def _save_chain(chain: list[Block]) -> None:
+def save_chain(chain: list[Block]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = CHAIN_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps([b.to_dict() for b in chain]))
-    os.replace(tmp, CHAIN_FILE)  # atomic: readers never see a half-written file
-
-
-def _update_gauges(chain: list[Block]) -> None:
-    BLOCK_HEIGHT.set(chain[-1].index)
-    PEER_COUNT.set(len(PEERS))
-
-
-def on_startup() -> None:
-    chain = _load_chain()
-    _update_gauges(chain)
+    CHAIN_FILE.write_text(json.dumps([b.to_dict() for b in chain]))
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    on_startup()
+    BLOCK_HEIGHT.set(load_chain()[-1].index)
     yield
 
 
-app = FastAPI(title="pow-node", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="pow-node-baseline", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/healthz")
@@ -106,86 +88,37 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/metrics")
+def metrics() -> Response:
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.get("/chain")
 def get_chain() -> list[dict[str, Any]]:
-    chain = _load_chain()
-    return [b.to_dict() for b in chain]
+    return [b.to_dict() for b in load_chain()]
 
 
 @app.get("/tx")
 def get_pending_tx() -> list[dict[str, Any]]:
-    return _pending_tx
+    return pending_tx
 
 
 @app.post("/tx", status_code=201)
 def add_tx(tx: Tx) -> dict[str, Any]:
-    entry = tx.model_dump()
-    entry["received_at"] = time.time()
-    with _lock:
-        _pending_tx.append(entry)
+    entry = tx.model_dump() | {"received_at": time.time()}
+    pending_tx.append(entry)  # TODO(TF): validate before accepting
     return entry
 
 
 @app.post("/mine")
 def mine_block() -> dict[str, Any]:
-    global _pending_tx
-    with _lock:
-        chain = _load_chain()
-        txs = list(_pending_tx) or [{"msg": "empty block"}]  # snapshot, not alias
-        _pending_tx = []
-        block = new_block(chain, txs, DIFFICULTY)
-        return _mine_and_append(chain, block)
-
-
-def _mine_and_append(chain: list[Block], block: Block) -> dict[str, Any]:
-    """Called with _lock held: a /tx that arrives meanwhile waits, it never
-    changes a block that is already being hashed."""
-    start = time.time()
-    mine(block)
-    elapsed = time.time() - start
-    MINING_SECONDS.observe(elapsed)
-
+    chain = load_chain()
+    block = mine(new_block(chain, list(pending_tx) or [{"msg": "empty block"}]))
+    pending_tx.clear()
     chain.append(block)
-    _save_chain(chain)
-    _update_gauges(chain)
-    return {"mined": block.to_dict(), "mining_seconds": elapsed}
-
-
-@app.get("/peers")
-def get_peers() -> list[str]:
-    return PEERS
-
-
-@app.post("/peers/sync")
-def sync_peers() -> dict[str, Any]:
-    """Longest-valid-chain rule: fetch every peer's chain, keep the best one
-    (including our own) among those that pass validate_chain()."""
-    with _lock:
-        local_chain = _load_chain()
-    candidates = [local_chain]
-
-    for peer in PEERS:
-        try:
-            resp = httpx.get(f"{peer}/chain", timeout=5.0)
-            resp.raise_for_status()
-            candidates.append([Block.from_dict(b) for b in resp.json()])
-        except Exception:
-            continue  # unreachable peer: skip it, do not fail the sync
-
-    best = choose_best_chain(candidates)
-    if best is None:
-        raise HTTPException(500, "no valid chain found among self + peers")
-
-    replaced = best is not local_chain and best != local_chain
-    with _lock:
-        _save_chain(best)
-    _update_gauges(best)
-    return {"replaced": replaced, "height": best[-1].index, "work": chain_work(best)}
-
-
-@app.get("/metrics")
-def metrics() -> Response:
-    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    save_chain(chain)
+    BLOCK_HEIGHT.set(block.index)
+    return {"mined": block.to_dict()}
 
 
 if __name__ == "__main__":

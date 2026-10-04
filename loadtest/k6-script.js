@@ -1,5 +1,5 @@
-// Class 6/8: quick load test used to trigger the HPA on servicio-patron,
-// model and pow. Run with (k6 installed, or `make loadtest`, which falls back
+// Class 6/8: quick load test used to trigger the HPA on servicio-patron
+// and model. Run with (k6 installed, or `make loadtest`, which falls back
 // to the grafana/k6 docker image):
 //   k6 run loadtest/k6-script.js
 //   k6 run -e TARGET=model -e MODEL_URL=http://localhost:8081 loadtest/k6-script.js
@@ -8,20 +8,17 @@
 //
 // Env vars (all optional, sensible localhost defaults -- no hardcoded
 // cluster hostnames):
-//   TARGET                 "servicio-patron" (default) | "model" | "pow"
+//   TARGET                 "servicio-patron" (default) | "model"
 //   SERVICIO_PATRON_URL    default http://localhost:8080
 //   MODEL_URL              default http://localhost:8081
-//   POW_URL                default http://localhost:8090
 //   SLEEP                  seconds each virtual user waits between iterations
 //                          (default 1). The model is so light that it needs
 //                          about 0.05 to push the HPA past 60% CPU.
-//   MINE_PROB              share of pow iterations that also call /mine (0.1)
 //   PEAK_VUS               virtual users at the peak (default 30)
 import http from "k6/http";
 import { check, sleep } from "k6";
 
 const SLEEP = Number(__ENV.SLEEP || 1);
-const MINE_PROB = Number(__ENV.MINE_PROB || 0.1);
 const PEAK_VUS = Number(__ENV.PEAK_VUS || 30);
 
 export const options = {
@@ -45,7 +42,6 @@ export const options = {
 const TARGET = __ENV.TARGET || "servicio-patron";
 const SERVICIO_PATRON_URL = __ENV.SERVICIO_PATRON_URL || "http://localhost:8080";
 const MODEL_URL = __ENV.MODEL_URL || "http://localhost:8081";
-const POW_URL = __ENV.POW_URL || "http://localhost:8090";
 
 export default function () {
   if (TARGET === "model") {
@@ -54,19 +50,6 @@ export default function () {
       headers: { "Content-Type": "application/json" },
     });
     check(res, { "predict 200": (r) => r.status === 200 });
-  } else if (TARGET === "pow") {
-    const tx = JSON.stringify({ sender: "loadtest", to: "sink", amount: 1 });
-    const txRes = http.post(`${POW_URL}/tx`, tx, {
-      headers: { "Content-Type": "application/json" },
-    });
-    check(txRes, { "tx 201": (r) => r.status === 201 });
-
-    // Mine occasionally, not on every VU iteration, to keep the mining
-    // pool from growing unbounded difficulty-wise during the test.
-    if (Math.random() < MINE_PROB) {
-      const mineRes = http.post(`${POW_URL}/mine`);
-      check(mineRes, { "mine 200": (r) => r.status === 200 });
-    }
   } else {
     const res = http.get(`${SERVICIO_PATRON_URL}/`);
     check(res, { "root 200": (r) => r.status === 200 });

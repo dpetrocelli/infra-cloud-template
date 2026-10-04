@@ -86,7 +86,8 @@ pasaste al instalar, el chart generó una al azar:
 `kubectl -n observability get secret kube-prom-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo`.
 
 En **Dashboards** aparecen `Servicio patron`, `Model server`, `Mini PoW
-blockchain` y `Anvil (BC dev chain)`. El del servicio patrón trae tres paneles (requests/s,
+baseline` (solo la altura de bloque; los paneles de tu red los agregás en el
+TF) y `Anvil (BC dev chain)`. El del servicio patrón trae tres paneles (requests/s,
 items/s, latencia p95 por path). Generá tráfico para verlos moverse:
 
 ```bash

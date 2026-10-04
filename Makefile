@@ -45,7 +45,7 @@ test-app: ## pytest of the servicio patron (class 1)
 test-model: ## pytest of the IA model server
 	@if [ -d model ]; then cd model && $(PYTEST); else echo "skip: no model/ folder"; fi
 
-test-pow: ## pytest of the PoW node
+test-pow: ## pytest of the PoW baseline node
 	@if [ -d pow ]; then cd pow && $(PYTEST); else echo "skip: no pow/ folder"; fi
 
 test-exporter: ## pytest of the Anvil exporter (class 6)
@@ -132,7 +132,6 @@ k3d-down: ## delete the local cluster (and its volumes)
 loadtest: ## k6 against localhost (docker grafana/k6 if k6 is not installed)
 	@envs="-e TARGET=$(or $(TARGET),servicio-patron) -e SLEEP=$(or $(SLEEP),1)"; \
 	[ -n "$(MODEL_URL)" ] && envs="$$envs -e MODEL_URL=$(MODEL_URL)"; \
-	[ -n "$(POW_URL)" ] && envs="$$envs -e POW_URL=$(POW_URL)"; \
 	[ -n "$(SERVICIO_PATRON_URL)" ] && envs="$$envs -e SERVICIO_PATRON_URL=$(SERVICIO_PATRON_URL)"; \
 	if command -v k6 >/dev/null 2>&1; then k6 run $$envs loadtest/k6-script.js; \
 	else docker run --rm --network host -v "$$PWD/loadtest:/scripts:ro" $(K6_IMAGE) run $$envs /scripts/k6-script.js; fi
