@@ -44,7 +44,7 @@ variable "enable_vm" {
 }
 
 variable "enable_gke" {
-  description = "Create the GKE cluster (class 5 onward). It costs money while it exists: destroy it after class."
+  description = "Create the GKE cluster (class 5 onward). It costs money while it exists: turn it off after class (enable_gke = false + apply)."
   type        = bool
   default     = false
 }
