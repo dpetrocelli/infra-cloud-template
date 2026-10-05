@@ -25,12 +25,12 @@ Al terminar tenés:
 ### 1. Lo mismo que corre CI, en tu laptop
 
 ```bash
-make test        # corre los tests de cada servicio del repo
-make build
+make test-app    # corre los tests del servicio patrón
+make build-app   # construye app:local, como el job build
 ```
 
-Si una herramienta de los tests no está instalada, el `Makefile` usa su
-imagen de Docker: no hace falta instalar nada más.
+Los tests corren con `uv` (si falta, `make doctor` te dice cómo instalarlo).
+Si agregaste un servicio propio, corré también su test y su build.
 
 ### 2. Primer push, sin variables
 
