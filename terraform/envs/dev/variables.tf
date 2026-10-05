@@ -1,0 +1,50 @@
+variable "project_id" {
+  description = "GCP project id. No default on purpose: never hardcode it."
+  type        = string
+}
+
+variable "region" {
+  description = "GCP region. The course uses southamerica-east1 (Sao Paulo) everywhere."
+  type        = string
+  default     = "southamerica-east1"
+}
+
+variable "zone" {
+  description = "GCP zone inside the region."
+  type        = string
+  default     = "southamerica-east1-a"
+}
+
+variable "servicio_patron_image" {
+  description = "Image the VM runs, e.g. southamerica-east1-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:v1 (pushed in class 3, or by ci.yml from class 4)."
+  type        = string
+}
+
+variable "app_port" {
+  type    = number
+  default = 8080
+}
+
+variable "app_source_ranges" {
+  description = "Source ranges allowed on app_port (firewall rule allow-app). Narrow it, e.g. [\"<your-ip>/32\"], for anything like an Anvil RPC."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "enable_artifact_registry" {
+  description = "Create the Artifact Registry repository infra-cloud-template. ONE env per project creates it (dev by default); a second one would fail with 409 already exists."
+  type        = bool
+  default     = true
+}
+
+variable "enable_vm" {
+  description = "Create the VM + data disk of classes 1-2."
+  type        = bool
+  default     = true
+}
+
+variable "enable_gke" {
+  description = "Create the GKE cluster (class 5 onward). It costs money while it exists: turn it off after class (enable_gke = false + apply)."
+  type        = bool
+  default     = false
+}
