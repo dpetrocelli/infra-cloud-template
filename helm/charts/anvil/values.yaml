@@ -1,4 +1,4 @@
-# Default values for the Anvil chart (BC track), written for GKE.
+# Default values for the Anvil chart, written for GKE.
 #   k3s / k3d:  helm upgrade --install anvil helm/charts/anvil -f helm/charts/anvil/values-k3s.yaml
 # Install it with the release name "anvil" so the names in the docs match.
 image:

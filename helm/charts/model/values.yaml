@@ -1,4 +1,4 @@
-# Default values for the model chart (IA track), written for GKE.
+# Default values for the model chart, written for GKE.
 #   GKE:        --set image.repository=$AR/model --set image.tag=<sha or vX.Y.Z>
 #   k3s / k3d:  -f helm/charts/model/values-k3s.yaml
 # Install it with the release name "model" so the names in the docs match.

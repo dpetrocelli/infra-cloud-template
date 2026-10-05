@@ -1,4 +1,4 @@
-"""Tiny inference server used in class 7 (IA: Vertex AI / Ollama / vast.ai
+"""Tiny inference server used in class 7 (Vertex AI / Ollama / vast.ai
 alternatives) and in the class-8 integrator case.
 
 Endpoints:

@@ -21,7 +21,7 @@ un Service headless).
 
 ## Qué trae esta línea base y qué falta
 
-El Trabajo Final de BC es **tu propia blockchain PoW con varios nodos, en
+El Trabajo Final es **tu propia blockchain PoW con varios nodos, en
 producción en la nube**. `pow/` y `helm/charts/pow` no son esa blockchain:
 son la línea base de la que partís.
 
@@ -33,6 +33,6 @@ son la línea base de la que partís.
 | `/healthz`, `/metrics` (`pow_block_height`), `/chain`, `/tx` en el puerto 8090 | consenso: la cadena más larga y válida gana |
 | chart con StatefulSet, un PVC por nodo, Service headless y `PEERS` | reglas del mempool y seguridad ante concurrencia |
 
-Los tests de `pow/tests/` que están en `skip` son la pista: cuando implementes
+Los tests de `pow/tests/` que están en `skip` son la guía: cuando implementes
 cada parte, sacales el `skip`. Con `replicaCount: 3` hoy tenés tres cadenas
 **independientes**; que converjan es tu trabajo (al menos 2 nodos sincronizando).

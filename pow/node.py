@@ -1,4 +1,4 @@
-"""HTTP node of the mini PoW blockchain: the BASELINE you extend into your TF (BC).
+"""HTTP node of the mini PoW blockchain: the BASELINE you extend into your TF.
 
 It runs as ONE node and already answers the contract the course uses
 (port 8090, the same paths the chart, the ServiceMonitor and the docs expect):

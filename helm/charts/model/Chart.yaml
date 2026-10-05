@@ -1,6 +1,6 @@
 apiVersion: v2
 name: model
-description: Class 7/8 (IA) - stateless inference server as a Deployment+HPA.
+description: Class 7/8 example - stateless inference server as a Deployment+HPA.
 type: application
 version: 0.2.0
 appVersion: "1.0.0"

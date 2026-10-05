@@ -1,6 +1,6 @@
 # Class 8 (caso integrador): Terraform (network + GKE) and then the Helm
 # charts, with an image tag that ci.yml already pushed. Manual trigger only:
-#   Actions > deploy > Run workflow > env=dev, image_tag=<git sha or vX.Y.Z>, charts=<your track charts>
+#   Actions > deploy > Run workflow > env=dev, image_tag=<git sha or vX.Y.Z>, charts=<the charts your lab asks for>
 #
 # Prerequisites (docs/clase-08.md has the commands):
 #   - the tfstate bucket gs://<GCP_PROJECT_ID>-tfstate exists;
@@ -30,7 +30,7 @@ on:
         required: true
         type: string
       charts:
-        description: "Charts to deploy (space separated, those missing in helm/charts are skipped). BC: 'pow'; IA: 'servicio-patron model'"
+        description: "Charts to deploy (space separated, those missing in helm/charts are skipped). Default: servicio-patron."
         required: false
         default: "servicio-patron"
         type: string

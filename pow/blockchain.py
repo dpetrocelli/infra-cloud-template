@@ -1,4 +1,4 @@
-"""Mini proof-of-work blockchain: the BASELINE you extend into your TF (BC).
+"""Mini proof-of-work blockchain: the BASELINE you extend into your TF.
 
 What is already here (read it once, it is short):
   - Block: the data of one block and its sha256 hash.

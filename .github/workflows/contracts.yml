@@ -1,4 +1,4 @@
-# Class 4 (BC): smart-contract pipeline.
+# Class 4: smart-contract pipeline.
 #   - every PR / push to main that touches contracts/  -> forge fmt --check + forge test
 #   - a release tag vX.Y.Z (any files)                 -> deploy to Base Sepolia (testnet)
 #     and keep the ABI + bytecode + deployment record as a run artifact.

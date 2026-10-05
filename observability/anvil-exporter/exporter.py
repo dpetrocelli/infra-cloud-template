@@ -1,4 +1,4 @@
-"""Tiny JSON-RPC -> Prometheus exporter for Anvil (class 6, BC dashboard).
+"""Tiny JSON-RPC -> Prometheus exporter for Anvil (class 6, Anvil dashboard).
 
 Anvil speaks Ethereum JSON-RPC, not Prometheus. Rather than pull in a big
 generic Ethereum exporter, this polls the one method the class dashboard
