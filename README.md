@@ -86,17 +86,17 @@ Para bajarlo: `make compose-down` (conserva los datos) o `make compose-reset`
 |---|---|---|---|
 | 1 | Arquitectura híbrida y cargas stateful sobre Compute Engine | [docs/clase-01.md](docs/clase-01.md) | `app/` en tu laptop y en una VM, con el estado en un disco aparte |
 | 2 | IaC con OpenTofu/Terraform sobre GCP | [docs/clase-02.md](docs/clase-02.md) | `terraform/modules/{network,vm,artifact-registry}`, `terraform/envs/dev` |
-| 3 | Contenedores con Docker y Artifact Registry | [docs/clase-03.md](docs/clase-03.md) · pista: [BC](docs/bc/clase-03.md) / [IA](docs/ia/clase-03.md) | los `Dockerfile`, `compose/`, el registry `infra-cloud-template` |
-| 4 | CI/CD con GitHub Actions y OIDC | [docs/clase-04.md](docs/clase-04.md) | `.github/workflows/ci.yml` (test, build, publish con OIDC) y `contracts.yml` (forge fmt + forge test; deploy a testnet con un tag) |
-| 5 | Kubernetes: Helm, PV y StatefulSets | [docs/clase-05.md](docs/clase-05.md) · pista: [BC](docs/bc/clase-05.md) / [IA](docs/ia/clase-05.md) | `helm/charts/*` con `values-k3s.yaml` (local) y `terraform/modules/gke` |
-| 6 | Observabilidad: Prometheus, Grafana y Loki | [docs/clase-06.md](docs/clase-06.md) · pista: [BC](docs/bc/clase-06.md) / [IA](docs/ia/clase-06.md) | `observability/` completo |
-| 7 | Del artefacto local a la nube: medir y comparar | [docs/clase-07.md](docs/clase-07.md) | la carga de ejemplo que pida tu aula |
-| 8 | Caso integrador: de git push a producción | [docs/clase-08.md](docs/clase-08.md) · pista: [BC](docs/bc/clase-08.md) / [IA](docs/ia/clase-08.md) | todo el repo, orquestado por `deploy.yml` |
+| 3 | Contenedores con Docker y Artifact Registry | [docs/clase-03.md](docs/clase-03.md) · guía específica: la que enlaza tu aula | los `Dockerfile`, `compose/`, el registry `infra-cloud-template` |
+| 4 | CI/CD con GitHub Actions y OIDC | [docs/clase-04.md](docs/clase-04.md) | `.github/workflows/ci.yml` (test, build y publish con OIDC) |
+| 5 | Kubernetes: Helm, PV y StatefulSets | [docs/clase-05.md](docs/clase-05.md) · ejercicio para tu área: el que enlaza tu aula | `helm/charts/*` con `values-k3s.yaml` (local) y `terraform/modules/gke` |
+| 6 | Observabilidad: Prometheus, Grafana y Loki | [docs/clase-06.md](docs/clase-06.md) · guía específica: la que enlaza tu aula | `observability/` completo |
+| 7 | Del artefacto local a la nube: medir y comparar | [docs/clase-07.md](docs/clase-07.md) · guía específica: la que enlaza tu aula | la carga de ejemplo que pida tu aula |
+| 8 | Caso integrador: de git push a producción | [docs/clase-08.md](docs/clase-08.md) · guía específica: la que enlaza tu aula | todo el repo, orquestado por `deploy.yml` |
 
 Cada guía tiene la misma estructura: objetivo, prerrequisitos, pasos
 numerados con la salida esperada, un recuadro "En la nube", limpieza y una
-tabla de errores frecuentes. Lo propio de cada diplomatura está en la guía de
-su pista (`docs/bc/` o `docs/ia/`): seguí solo la que te indica tu aula.
+tabla de errores frecuentes. Algunas clases tienen además una guía
+específica, enlazada desde tu aula: seguí la que te indica Moodle.
 
 ## ¿Qué hay acá adentro?
 
@@ -121,7 +121,7 @@ observability/       valores de kube-prometheus-stack y Loki, config de
 .github/workflows/   ci.yml, contracts.yml y deploy.yml (OIDC, sin claves).
 loadtest/            script de k6 y un Job para correrlo dentro del cluster.
 scripts/             doctor.sh (make doctor) y compute-tags.sh (tags de CI).
-docs/                una guía por clase, y la de cada pista en docs/bc y docs/ia.
+docs/                una guía por clase, más guías específicas que enlaza tu aula.
 ```
 
 ## Nombres, puertos y tags (una sola tabla para todo el curso)
@@ -195,8 +195,7 @@ make k3d-up && make k3d-images   # cluster local con las imágenes adentro
 | `curl: (56) Recv failure: Connection reset by peer` | El servicio todavía arranca: esperá 2 segundos o usá `--wait` en compose. |
 | `uv: command not found` / `forge: not found` | `make doctor` te dice qué instalar; `make test-contracts` usa Docker si no hay forge. |
 | `Backend initialization required` | [clase 2](docs/clase-02.md#errores-frecuentes): el chequeo offline es `init -backend=false` + `validate`, no `plan`. |
-| El saldo de Anvil volvió a 10000 ETH | [clase 3, pista BC](docs/bc/clase-03.md#errores-frecuentes): el volumen de estado no era escribible. |
-| Pods en `Pending` | [clase 5](docs/clase-05.md#errores-frecuentes): StorageClass o disco casi lleno. |
+| Pods en `Pending` | [clase 5](docs/clase-05.md#errores-frecuentes): disco casi lleno (disk-pressure). |
 | `ErrImageNeverPull` / `ErrImagePull` | [clase 5](docs/clase-05.md#errores-frecuentes): falta `make k3d-images` o el `image.repository`. |
 | `publish` aparece gris (skipped) en Actions | [clase 4](docs/clase-04.md#errores-frecuentes): es lo esperado hasta cargar las variables. |
 

@@ -1,7 +1,7 @@
-# Clase 5 · Pista IA: el modelo como Deployment con HPA
+# Clase 5 · Ejercicio para tu área: el modelo como Deployment con HPA
 
 Complementa la [guía de la clase 5](../clase-05.md). Hacé primero sus pasos 1 a
-6 (cluster k3d, imágenes y servicio patrón); esto es lo propio de tu pista. Los
+6 (cluster k3d, imágenes y servicio patrón); esto es el ejercicio para tu área. Los
 comandos se corren desde la raíz del repo, con el cluster local activo.
 
 El modelo no tiene estado propio (los pesos están en la imagen), así que es un

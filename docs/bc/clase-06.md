@@ -1,8 +1,8 @@
-# Clase 6 · Pista BC: métricas de Anvil
+# Clase 6 · Blockchain: métricas de Anvil
 
 Complementa la [guía de la clase 6](../clase-06.md). Hacé primero sus pasos 1
 a 4 (Prometheus, Grafana, ServiceMonitors y dashboards); esto es lo propio de
-tu pista. Los comandos se corren desde la raíz del repo.
+tu área. Los comandos se corren desde la raíz del repo.
 
 Anvil habla JSON-RPC, no Prometheus. `observability/anvil-exporter/` es un
 traductor de 40 líneas que publica `anvil_block_number`.

@@ -1,8 +1,8 @@
-# Clase 8 · Pista IA: el modelo escalando con el HPA
+# Clase 8 · El modelo escalando con el HPA
 
 Complementa la [guía de la clase 8](../clase-08.md). Hacé primero sus pasos 1 a
 3 (tests, imágenes, observabilidad y servicio patrón en k3d); esto es lo propio
-de tu pista. Los comandos se corren desde la raíz del repo, con el cluster local
+de tu curso. Los comandos se corren desde la raíz del repo, con el cluster local
 activo.
 
 ## 1. Desplegá el modelo

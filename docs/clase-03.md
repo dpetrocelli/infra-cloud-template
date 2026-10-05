@@ -11,7 +11,7 @@ Al terminar tenés:
 1. La imagen del servicio patrón construida y probada en tu laptop.
 2. El servicio patrón con compose, con el estado en un volumen que sobrevive a `down`/`up`.
 3. Tu imagen publicada en Artifact Registry como `$AR/app:v1` y bajada desde otra máquina.
-4. Lo mismo con la carga de la pista de tu diplomatura:
+4. Lo mismo con la carga de ejemplo que pida tu aula:
    [docs/bc/clase-03.md](bc/clase-03.md) o [docs/ia/clase-03.md](ia/clase-03.md).
 
 ## Prerrequisitos
@@ -40,7 +40,7 @@ app:local             256MB
 
 La base `python:3.12-slim` ya pesa unos 190 MB. Los warnings
 `Running pip as the 'root' user` del build no son errores. La imagen de la
-carga de tu pista se construye en su guía (punto 4 del objetivo).
+carga de ejemplo de tu aula se construye en su guía (punto 4 del objetivo).
 
 ### 2. Corré una imagen con un volumen con nombre
 
@@ -119,7 +119,7 @@ responde 500 y en `docker logs` aparece `PermissionError`.
 > gcloud artifacts docker images list "$AR"
 > ```
 >
-> Bajala en una segunda VM (`servicio-patron-2`, ver el lab de la clase: scope
+> Bajala en una segunda VM (`servicio-patron-2`, ver el «Lab Clase 3 - Docker y Artifact Registry» del aula: scope
 > `cloud-platform` y rol `roles/artifactregistry.reader`). En la VM los comandos
 > de docker van con `sudo`, así que la autenticación también:
 >

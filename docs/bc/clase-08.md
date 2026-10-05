@@ -1,7 +1,7 @@
-# Clase 8 · Pista BC: la línea base PoW, de punta a punta
+# Clase 8 · La línea base PoW, de punta a punta
 
 Complementa la [guía de la clase 8](../clase-08.md). Hacé primero sus pasos 1 y
-2 (tests, imágenes y observabilidad en k3d); esto es lo propio de tu pista. Los
+2 (tests, imágenes y observabilidad en k3d); esto es lo propio de tu curso. Los
 comandos se corren desde la raíz del repo, con el cluster local activo.
 
 ## 1. Desplegá la línea base (un nodo)
@@ -78,8 +78,8 @@ kubectl delete pvc -l app=pow        # borra la cadena
 
 | Si ves | Causa | Hacé |
 |---|---|---|
-| PVC `Pending`, `storageclass "standard" not found` | Instalaste con los valores de GKE | `helm uninstall pow`, `kubectl delete pvc -l app=pow`, reinstalá con `-f values-k3s.yaml` |
-| `UPGRADE FAILED: ... updates to statefulset spec ... are forbidden` | Cambiaste StorageClass, tamaño o `PEERS` (con `replicaCount`) de un release existente | `helm uninstall pow`, `kubectl delete pvc -l app=pow` y reinstalá |
+| `ErrImagePull` en k3s (busca `pow:v1` en Docker Hub) | Instalaste sin `-f values-k3s.yaml` | `helm uninstall pow`, `kubectl delete pvc -l app=pow`, reinstalá con `-f values-k3s.yaml` |
+| `UPGRADE FAILED: ... updates to statefulset spec ... are forbidden` | Cambiaste la StorageClass o el tamaño del volumen (`volumeClaimTemplates` es inmutable) de un release existente; `replicaCount` sí se puede cambiar con `helm upgrade` | `helm uninstall pow`, `kubectl delete pvc -l app=pow` y reinstalá |
 | `422` en `POST /tx` | Falta `-H 'Content-Type: application/json'` o el campo es `sender` (no `from`) | Copiá el curl de arriba |
 | `404` en `/peers` o `/peers/sync` | La línea base no los trae | Es `TODO(TF)` en `pow/node.py` |
 | Con 3 réplicas cada nodo tiene otra altura | Sin `/peers/sync` no hay consenso | Es el corazón del TF |

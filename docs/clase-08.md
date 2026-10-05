@@ -19,7 +19,7 @@ Al terminar tenés:
 
 1. Un **ensayo completo en tu laptop** (k3d) con el servicio patrón: despliegue,
    verificación, carga y un nuevo deploy.
-2. Lo mismo con la carga de la pista de tu diplomatura:
+2. Lo mismo con la carga de tu curso:
    [docs/bc/clase-08.md](bc/clase-08.md) o [docs/ia/clase-08.md](ia/clase-08.md).
 3. (En la nube) el mismo flujo con `deploy.yml` contra GKE.
 
@@ -73,7 +73,7 @@ kubectl get hpa servicio-patron -w        # Ctrl+C para salir
 `kubectl logs job/k6` muestra el resumen: `checks` cerca de 100% y
 `http_req_failed` debajo de 5%. En Grafana, el dashboard `Servicio patron`
 muestra requests/s y latencia mientras dura la carga. El valor de `TARGET` y
-`SLEEP` para la carga de tu pista está en su guía.
+`SLEEP` para la carga de tu curso está en su guía.
 
 ### 5. Un cambio y un nuevo deploy
 
@@ -126,7 +126,7 @@ contador sigue: vive en el PVC.
 > 1. `git push` a `main` y esperá que `ci` publique (el sha está en el log de
 >    `publish`: `pushed .../app:<sha>`; o `git rev-parse HEAD`).
 > 2. **Actions → deploy → Run workflow**: `env=dev`, `image_tag=<ese sha>` (o
->    `v0.1.0` si creaste el tag) y `charts` con los charts de tu pista (el
+>    `v0.1.0` si creaste el tag) y `charts` con los charts de tu curso (ver tu guía de la clase 8; el
 >    default es solo `servicio-patron`). `latest` se rechaza.
 > 3. El job `terraform` aplica la red y GKE (`enable_gke=true`); el job `helm`
 >    hace `helm upgrade --install --wait` de los charts del input `charts`, con

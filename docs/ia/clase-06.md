@@ -1,8 +1,8 @@
-# Clase 6 · Pista IA: el modelo bajo carga
+# Clase 6 · IA: el modelo bajo carga
 
 Complementa la [guía de la clase 6](../clase-06.md). Hacé primero sus pasos 1
 a 4 (Prometheus, Grafana, ServiceMonitors y dashboards); esto es lo propio de
-tu pista. Los comandos se corren desde la raíz del repo.
+tu área. Los comandos se corren desde la raíz del repo.
 
 ```bash
 helm upgrade --install model helm/charts/model -f helm/charts/model/values-k3s.yaml --wait
@@ -19,6 +19,15 @@ a un solo pod y las réplicas nuevas no reciben tráfico.
 Las métricas del modelo son `model_predictions_total` y el histograma
 `model_predict_seconds`. Si querés una métrica propia (por ejemplo la
 confianza), agregala en `model/serve.py` con `prometheus_client`.
+Después reconstruí la imagen y reiniciá el Deployment, porque Prometheus
+scrapea el pod que corre, no tu archivo:
+
+```bash
+make build-model && k3d image import model:local -c infra-cloud && kubectl rollout restart deploy/model
+```
+
+En GKE: subí un tag nuevo a Artifact Registry y
+`helm upgrade model helm/charts/model --reuse-values --set image.tag=<tag>`.
 
 ## Limpieza
 

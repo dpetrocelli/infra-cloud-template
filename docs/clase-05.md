@@ -11,7 +11,7 @@ Al terminar tenés:
 
 1. Un cluster local con las imágenes del repo adentro.
 2. `servicio-patron` instalado con Helm, con su PVC `Bound`, y la prueba de que el contador sobrevive a `kubectl delete pod`.
-3. La pista de tu diplomatura: [docs/bc/clase-05.md](bc/clase-05.md) o [docs/ia/clase-05.md](ia/clase-05.md).
+3. El ejercicio para tu área: [docs/bc/clase-05.md](bc/clase-05.md) o [docs/ia/clase-05.md](ia/clase-05.md) (seguí el que te indica tu aula).
 4. (En la nube) lo mismo en GKE con la imagen de Artifact Registry.
 
 ## Prerrequisitos
@@ -155,7 +155,7 @@ make k3d-down                   # borra el cluster entero
 
 | Si ves | Causa | Hacé |
 |---|---|---|
-| Pod y PVC en `Pending`, y `kubectl describe pvc` dice `storageclass "standard" not found` | Instalaste con valores de GKE en k3s | `helm uninstall`, `kubectl delete pvc -l app=<chart>` e instalá con `-f values-k3s.yaml` |
+| `ErrImagePull` en k3s (busca `app:v1` en Docker Hub) | Instalaste sin `-f values-k3s.yaml` | `helm uninstall`, `kubectl delete pvc -l app=<chart>` y reinstalá con `-f values-k3s.yaml` |
 | `UPGRADE FAILED: ... updates to statefulset spec for fields other than 'replicas' ... are forbidden` | Cambiaste la StorageClass, el tamaño del volumen u otro campo fijo de un StatefulSet existente | `helm uninstall <release>`, `kubectl delete pvc -l app=<release>` y reinstalá |
 | `ErrImageNeverPull` | La imagen `:local` no está en el cluster | `make k3d-images` |
 | `ErrImagePull` / `ImagePullBackOff` en GKE | `image.repository` o el tag no existen en Artifact Registry | `--set image.repository=$AR/app --set image.tag=v1`; revisá `gcloud artifacts docker images list $AR` |

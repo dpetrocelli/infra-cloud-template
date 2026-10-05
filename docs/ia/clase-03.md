@@ -1,14 +1,14 @@
-# Clase 3 · Pista IA: el servidor de inferencia
+# Clase 3 · El servidor de inferencia
 
 Complementa la [guía de la clase 3](../clase-03.md). Hacé primero sus pasos 1 a
-3 (servicio patrón con Docker y con compose); esto es lo propio de tu pista.
+3 (servicio patrón con Docker y con compose); esto agrega el servidor de inferencia al mismo circuito.
 Los comandos se corren desde la raíz del repo.
 
 ## Prerrequisitos
 
 - [ ] Nada corriendo en 8080 ni en 8081 (`make doctor` lo chequea).
 
-## 1. Construí las imágenes de la pista
+## 1. Construí las imágenes
 
 ```bash
 make build-app build-model

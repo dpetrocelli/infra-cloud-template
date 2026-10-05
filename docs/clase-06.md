@@ -17,7 +17,7 @@ Al terminar tenés:
 1. kube-prometheus-stack, Loki y Alloy instalados en el namespace `observability`.
 2. Los targets de tus servicios en `UP` y los dashboards del repo cargados.
 3. Una consulta LogQL que encuentra tus errores.
-4. Las métricas de la carga de tu pista: [docs/bc/clase-06.md](bc/clase-06.md) o
+4. Las métricas de la carga de tu área: [docs/bc/clase-06.md](bc/clase-06.md) o
    [docs/ia/clase-06.md](ia/clase-06.md).
 
 ## Prerrequisitos
@@ -87,8 +87,8 @@ pasaste al instalar, el chart generó una al azar:
 `kubectl -n observability get secret kube-prom-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo`.
 
 En **Dashboards** aparecen los dashboards de `observability/dashboards/`: usá
-el del servicio patrón y el que corresponde a tu servicio (lo ves en la pista
-de tu diplomatura, punto 4 del objetivo). El del servicio patrón trae tres paneles (requests/s,
+el del servicio patrón y el que corresponde a tu servicio (lo ves en la guía
+de tu área, punto 4 del objetivo). El del servicio patrón trae tres paneles (requests/s,
 items/s, latencia p95 por path). Generá tráfico para verlos moverse:
 
 ```bash
