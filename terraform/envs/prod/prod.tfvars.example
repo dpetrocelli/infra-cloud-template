@@ -2,8 +2,8 @@
 # values from the repository variables instead; this file is for reading
 # the plan from your laptop.
 project_id = "my-project-id"
-region     = "southamerica-east1"
-zone       = "southamerica-east1-a"
+region     = "us-central1"
+zone       = "us-central1-a"
 
 # The registry already exists (created by envs/dev). Set this to true only
 # if you never applied envs/dev in this project.

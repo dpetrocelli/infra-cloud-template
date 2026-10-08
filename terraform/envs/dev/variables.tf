@@ -16,8 +16,9 @@ variable "zone" {
 }
 
 variable "servicio_patron_image" {
-  description = "Image the VM runs, e.g. southamerica-east1-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:v1 (pushed in class 3, or by ci.yml from class 4)."
+  description = "Image the VM runs, e.g. <region>-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:v1 (class 3 onward). Empty = class 2: the VM serves nginx on port 80."
   type        = string
+  default     = ""
 }
 
 variable "app_port" {
@@ -47,4 +48,10 @@ variable "enable_gke" {
   description = "Create the GKE cluster (class 5 onward). It costs money while it exists: turn it off after class (enable_gke = false + apply)."
   type        = bool
   default     = false
+}
+
+variable "spot" {
+  description = "Run the VM as Spot (much cheaper, GCP may stop it). Default: on in dev."
+  type        = bool
+  default     = true
 }

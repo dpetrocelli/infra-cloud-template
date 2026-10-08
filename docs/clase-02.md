@@ -22,8 +22,136 @@ podés escribir `terraform`.
 - [ ] OpenTofu ≥ 1.6 (`tofu version`) o Terraform ≥ 1.6 (`terraform version`).
 - [ ] Estás en la raíz del repo.
 - [ ] Para la parte en la nube: gcloud logueado (`gcloud config get-value project`
-      muestra tu proyecto) y la imagen `app:v1` subida (clase 3) o la receta de
-      Cloud Build de abajo.
+      muestra tu proyecto). La imagen `app:v1` recién hace falta para el
+      servicio patrón (clase 3); el Paso 0 no la necesita.
+
+## Paso 0: un servidor web, primero a mano y después con código
+
+La idea de toda la clase en un solo ejercicio: una VM con nginx que contesta
+desde internet. Primero la armás a mano (consola + SSH), después la misma VM
+sale de `terraform/envs/dev` y `terraform/envs/prod` con un `tofu apply`.
+
+Usamos **`us-central1`** (de las regiones más baratas) y VMs **Spot**
+(mucho más baratas; a cambio, GCP las puede apagar en cualquier momento).
+
+### A. A mano, desde la consola de GCP
+
+**1.** Compute Engine → VM instances → **Create instance**. Nombre
+`nginx-manual`, región `us-central1 (Iowa)`, zona `us-central1-a`, serie
+**E2**, tipo `e2-small`.
+
+![Nombre, región y zona](img/clase-02/01-crear-vm-region-zona.png)
+
+**2.** Más abajo, en **Provisioning model**, elegí **Spot**. Mirá cómo baja el
+estimado mensual.
+
+![Modelo Spot](img/clase-02/02-spot.png)
+
+**3.** En **Networking**, tildá **Allow HTTP traffic**. La consola le pone el
+tag `http-server` a la VM y crea la regla de firewall `default-allow-http`
+(puerto 80).
+
+![Allow HTTP traffic](img/clase-02/03-firewall-http.png)
+
+**4.** Antes de crear, abrí **Equivalent code**: la consola te muestra el mismo
+pedido como comando `gcloud`…
+
+![Equivalente en gcloud](img/clase-02/04-codigo-equivalente-gcloud.png)
+
+…y como **Terraform**. Esto es lo que vamos a escribir nosotros, más prolijo.
+
+![Equivalente en Terraform](img/clase-02/05-codigo-equivalente-terraform.png)
+
+**5.** **Create**. En un minuto la VM está corriendo con una IP externa.
+
+![VM corriendo](img/clase-02/06-vm-corriendo.png)
+
+**6.** Botón **SSH** de la fila, y adentro de la VM:
+
+```bash
+sudo apt-get update && sudo apt-get install -y nginx
+```
+
+![apt-get install nginx por SSH](img/clase-02/07-ssh-apt-install-nginx.png)
+
+```bash
+systemctl is-active nginx
+curl -s localhost | head -5
+```
+
+![nginx activo](img/clase-02/08-nginx-activo.png)
+
+**7.** Desde tu navegador: `http://<IP-externa>/`
+
+![nginx desde internet](img/clase-02/09-nginx-desde-internet.png)
+
+Lo mismo por línea de comandos, si preferís:
+
+```bash
+gcloud compute instances create nginx-manual --zone=us-central1-a \
+  --machine-type=e2-small --provisioning-model=SPOT \
+  --instance-termination-action=STOP --tags=http-server
+gcloud compute firewall-rules create default-allow-http \
+  --network=default --allow=tcp:80 --target-tags=http-server
+gcloud compute ssh nginx-manual --zone=us-central1-a \
+  --command='sudo apt-get update && sudo apt-get install -y nginx'
+```
+
+Preguntate: ¿cuántos clics y comandos fueron? ¿Quién se acuerda de ellos en un
+mes? ¿Cómo sabés que la VM de tu compañero quedó igual que la tuya?
+
+**8. Borrala** (cuesta plata mientras exista):
+
+```bash
+gcloud compute instances delete nginx-manual --zone=us-central1-a --quiet
+gcloud compute firewall-rules delete default-allow-http --quiet
+```
+
+### B. Lo mismo con código: `envs/dev` y `envs/prod`
+
+El módulo `vm` tiene dos modos. Si **no** le pasás imagen
+(`servicio_patron_image` vacío), el script de arranque hace lo que hiciste por
+SSH: instala nginx y lo deja en el puerto 80. Desde la clase 3 le pasás la
+imagen y corre el servicio patrón en Docker.
+
+```bash
+export PROJECT_ID="mi-proyecto-123"
+gcloud auth application-default login
+gcloud services enable compute.googleapis.com storage.googleapis.com
+gcloud storage buckets create "gs://${PROJECT_ID}-tfstate" --location=us-central1 --uniform-bucket-level-access
+
+cd terraform/envs/dev
+cp backend.hcl.example backend.hcl    # bucket = "<tu-proyecto>-tfstate"
+cp dev.tfvars.example dev.tfvars      # project_id; servicio_patron_image vacío
+tofu init -backend-config=backend.hcl
+tofu plan -var-file=dev.tfvars -out=dev.plan    # leelo antes de aplicar
+tofu apply dev.plan
+curl "$(tofu output -raw vm_url)"               # esperá 1-2 min a que termine apt
+```
+
+En el plan buscá `provisioning_model = "SPOT"` y, en el `metadata_startup_script`,
+el `apt-get install -y nginx`: son tus clics y tu SSH, ahora como código.
+
+**prod** usa los mismos módulos con otro estado y otros nombres. Por defecto
+prod no crea la VM (en la clase 8 solo necesita el cluster), así que para esta
+clase la prendés y apagás el cluster:
+
+```bash
+cd ../prod
+cp backend.hcl.example backend.hcl
+cp prod.tfvars.example prod.tfvars
+tofu init -backend-config=backend.hcl
+tofu plan  -var-file=prod.tfvars -var enable_vm=true -var enable_gke=false
+tofu apply -var-file=prod.tfvars -var enable_vm=true -var enable_gke=false
+curl "$(tofu output -raw vm_url)"
+```
+
+Diferencias que vas a ver en el plan: prefijo `infra-cloud-prod`, VM
+**Standard** (no Spot: en prod no querés que GCP te la apague) y sin registry
+(ya lo creó dev).
+
+**Limpieza:** `tofu destroy` en cada carpeta, con los mismos `-var-file` y
+`-var` que usaste en el apply.
 
 ## Pasos sin nube
 
@@ -35,8 +163,8 @@ make tf-validate
 ```
 
 Esperado: `make tf-fmt` no imprime nada, y `make tf-validate` termina cada
-carpeta con `Success! The configuration is valid.` (son 6: `envs/dev`,
-`envs/prod` y los 4 módulos).
+carpeta con `Success! The configuration is valid.` (son 7: `envs/dev`,
+`envs/prod`, `examples/nginx-vm` y los 4 módulos).
 
 `init -backend=false` **solo** sirve para `validate`: no conecta el backend,
 así que un `plan` después de eso falla con `Backend initialization required`.
@@ -70,7 +198,7 @@ cd - && rm -r "$tmp"
 Esperado, al final: `Plan: 8 to add, 0 to change, 0 to destroy.` (red, subred,
 3 reglas de firewall, registry, disco y VM).
 
-## Pasos en GCP
+## Pasos en GCP con el servicio patrón (desde la clase 3)
 
 > ### En la nube (dev)
 >

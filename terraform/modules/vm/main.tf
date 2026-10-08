@@ -1,5 +1,7 @@
 # Class 1: Compute Engine instance + a SEPARATE persistent disk, attached
-# and mounted by the startup script. The disk outlives the VM on purpose:
+# and mounted by the startup script. Class 2 runs it with no container_image:
+# the startup script installs nginx instead of Docker (same VM you built by
+# hand, now as code). The disk outlives the VM on purpose:
 # that is the whole "stateful vs stateless" lesson.
 
 resource "google_compute_disk" "data" {
@@ -58,6 +60,15 @@ resource "google_compute_instance" "this" {
   labels = {
     environment = var.environment
     managed_by  = "opentofu"
+  }
+
+  # Spot: much cheaper, GCP may stop it any time (it comes back on `start`).
+  scheduling {
+    provisioning_model          = var.spot ? "SPOT" : "STANDARD"
+    preemptible                 = var.spot
+    automatic_restart           = var.spot ? false : true
+    on_host_maintenance         = var.spot ? "TERMINATE" : "MIGRATE"
+    instance_termination_action = var.spot ? "STOP" : null
   }
 
   allow_stopping_for_update = true
