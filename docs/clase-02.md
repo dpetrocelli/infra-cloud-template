@@ -153,6 +153,33 @@ Diferencias que vas a ver en el plan: prefijo `infra-cloud-prod`, VM
 **Limpieza:** `tofu destroy` en cada carpeta, con los mismos `-var-file` y
 `-var` que usaste en el apply.
 
+## Credenciales: ¿con qué identidad corre tofu?
+
+En clase usamos **tu usuario**: `gcloud auth application-default login`.
+Son credenciales distintas de las de `gcloud auth login` y son las que lee tofu.
+
+Lo prolijo es una **service account con lo mínimo**, usada por
+**impersonación**: tu usuario pide un token temporal a nombre de la service
+account y no existe ninguna clave JSON que se pueda filtrar. El script la
+crea con sus roles, el bucket del estado y el permiso para que vos la uses:
+
+```bash
+PROJECT_ID=mi-proyecto-123 ./scripts/create-tofu-sa.sh
+# compañero del grupo: MEMBER=user:su@mail.com PROJECT_ID=... ./scripts/create-tofu-sa.sh
+```
+
+Después, en `terraform/envs/dev`:
+
+```bash
+export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=tofu-deployer@mi-proyecto-123.iam.gserviceaccount.com
+# y en backend.hcl, la línea impersonate_service_account (está comentada en el .example)
+```
+
+Lo que **no** se hace: bajar una clave JSON y usarla con
+`GOOGLE_APPLICATION_CREDENTIALS`. Es un secreto que no vence y termina en git o
+en un chat. En la clase 4 el pipeline hace lo mismo que la impersonación, pero
+con Workload Identity Federation.
+
 ## Pasos sin nube
 
 ### 1. Formato y validación de todo `terraform/`
