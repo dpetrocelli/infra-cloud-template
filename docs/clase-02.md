@@ -22,8 +22,163 @@ podés escribir `terraform`.
 - [ ] OpenTofu ≥ 1.6 (`tofu version`) o Terraform ≥ 1.6 (`terraform version`).
 - [ ] Estás en la raíz del repo.
 - [ ] Para la parte en la nube: gcloud logueado (`gcloud config get-value project`
-      muestra tu proyecto) y la imagen `app:v1` subida (clase 3) o la receta de
-      Cloud Build de abajo.
+      muestra tu proyecto). La imagen `app:v1` recién hace falta para el
+      servicio patrón (clase 3); el Paso 0 no la necesita.
+
+## Paso 0: un servidor web, primero a mano y después con código
+
+La idea de toda la clase en un solo ejercicio: una VM con nginx que contesta
+desde internet. Primero la armás a mano (consola + SSH), después la misma VM
+sale de `terraform/envs/dev` y `terraform/envs/prod` con un `tofu apply`.
+
+Usamos **`us-central1`** (de las regiones más baratas) y VMs **Spot**
+(mucho más baratas; a cambio, GCP las puede apagar en cualquier momento).
+
+### A. A mano, desde la consola de GCP
+
+**1.** Compute Engine → VM instances → **Create instance**. Nombre
+`nginx-manual`, región `us-central1 (Iowa)`, zona `us-central1-a`, serie
+**E2**, tipo `e2-small`.
+
+![Nombre, región y zona](img/clase-02/01-crear-vm-region-zona.png)
+
+**2.** Más abajo, en **Provisioning model**, elegí **Spot**. Mirá cómo baja el
+estimado mensual.
+
+![Modelo Spot](img/clase-02/02-spot.png)
+
+**3.** En **Networking**, tildá **Allow HTTP traffic**. La consola le pone el
+tag `http-server` a la VM y crea la regla de firewall `default-allow-http`
+(puerto 80).
+
+![Allow HTTP traffic](img/clase-02/03-firewall-http.png)
+
+**4.** Antes de crear, abrí **Equivalent code**: la consola te muestra el mismo
+pedido como comando `gcloud`…
+
+![Equivalente en gcloud](img/clase-02/04-codigo-equivalente-gcloud.png)
+
+…y como **Terraform**. Esto es lo que vamos a escribir nosotros, más prolijo.
+
+![Equivalente en Terraform](img/clase-02/05-codigo-equivalente-terraform.png)
+
+**5.** **Create**. En un minuto la VM está corriendo con una IP externa.
+
+![VM corriendo](img/clase-02/06-vm-corriendo.png)
+
+**6.** Botón **SSH** de la fila, y adentro de la VM:
+
+```bash
+sudo apt-get update && sudo apt-get install -y nginx
+```
+
+![apt-get install nginx por SSH](img/clase-02/07-ssh-apt-install-nginx.png)
+
+```bash
+systemctl is-active nginx
+curl -s localhost | head -5
+```
+
+![nginx activo](img/clase-02/08-nginx-activo.png)
+
+**7.** Desde tu navegador: `http://<IP-externa>/`
+
+![nginx desde internet](img/clase-02/09-nginx-desde-internet.png)
+
+Lo mismo por línea de comandos, si preferís:
+
+```bash
+gcloud compute instances create nginx-manual --zone=us-central1-a \
+  --machine-type=e2-small --provisioning-model=SPOT \
+  --instance-termination-action=STOP --tags=http-server
+gcloud compute firewall-rules create default-allow-http \
+  --network=default --allow=tcp:80 --target-tags=http-server
+gcloud compute ssh nginx-manual --zone=us-central1-a \
+  --command='sudo apt-get update && sudo apt-get install -y nginx'
+```
+
+Preguntate: ¿cuántos clics y comandos fueron? ¿Quién se acuerda de ellos en un
+mes? ¿Cómo sabés que la VM de tu compañero quedó igual que la tuya?
+
+**8. Borrala** (cuesta plata mientras exista):
+
+```bash
+gcloud compute instances delete nginx-manual --zone=us-central1-a --quiet
+gcloud compute firewall-rules delete default-allow-http --quiet
+```
+
+### B. Lo mismo con código: `envs/dev` y `envs/prod`
+
+El módulo `vm` tiene dos modos. Si **no** le pasás imagen
+(`servicio_patron_image` vacío), el script de arranque hace lo que hiciste por
+SSH: instala nginx y lo deja en el puerto 80. Desde la clase 3 le pasás la
+imagen y corre el servicio patrón en Docker.
+
+```bash
+export PROJECT_ID="mi-proyecto-123"
+gcloud auth application-default login
+gcloud services enable compute.googleapis.com storage.googleapis.com
+gcloud storage buckets create "gs://${PROJECT_ID}-tfstate" --location=us-central1 --uniform-bucket-level-access
+
+cd terraform/envs/dev
+cp backend.hcl.example backend.hcl    # bucket = "<tu-proyecto>-tfstate"
+cp dev.tfvars.example dev.tfvars      # project_id; servicio_patron_image vacío
+tofu init -backend-config=backend.hcl
+tofu plan -var-file=dev.tfvars -out=dev.plan    # leelo antes de aplicar
+tofu apply dev.plan
+curl "$(tofu output -raw vm_url)"               # esperá 1-2 min a que termine apt
+```
+
+En el plan buscá `provisioning_model = "SPOT"` y, en el `metadata_startup_script`,
+el `apt-get install -y nginx`: son tus clics y tu SSH, ahora como código.
+
+**prod** usa los mismos módulos con otro estado y otros nombres. Por defecto
+prod no crea la VM (en la clase 8 solo necesita el cluster), así que para esta
+clase la prendés y apagás el cluster:
+
+```bash
+cd ../prod
+cp backend.hcl.example backend.hcl
+cp prod.tfvars.example prod.tfvars
+tofu init -backend-config=backend.hcl
+tofu plan  -var-file=prod.tfvars -var enable_vm=true -var enable_gke=false
+tofu apply -var-file=prod.tfvars -var enable_vm=true -var enable_gke=false
+curl "$(tofu output -raw vm_url)"
+```
+
+Diferencias que vas a ver en el plan: prefijo `infra-cloud-prod`, VM
+**Standard** (no Spot: en prod no querés que GCP te la apague) y sin registry
+(ya lo creó dev).
+
+**Limpieza:** `tofu destroy` en cada carpeta, con los mismos `-var-file` y
+`-var` que usaste en el apply.
+
+## Credenciales: ¿con qué identidad corre tofu?
+
+En clase usamos **tu usuario**: `gcloud auth application-default login`.
+Son credenciales distintas de las de `gcloud auth login` y son las que lee tofu.
+
+Lo prolijo es una **service account con lo mínimo**, usada por
+**impersonación**: tu usuario pide un token temporal a nombre de la service
+account y no existe ninguna clave JSON que se pueda filtrar. El script la
+crea con sus roles, el bucket del estado y el permiso para que vos la uses:
+
+```bash
+PROJECT_ID=mi-proyecto-123 ./scripts/create-tofu-sa.sh
+# compañero del grupo: MEMBER=user:su@mail.com PROJECT_ID=... ./scripts/create-tofu-sa.sh
+```
+
+Después, en `terraform/envs/dev`:
+
+```bash
+export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=tofu-deployer@mi-proyecto-123.iam.gserviceaccount.com
+# y en backend.hcl, la línea impersonate_service_account (está comentada en el .example)
+```
+
+Lo que **no** se hace: bajar una clave JSON y usarla con
+`GOOGLE_APPLICATION_CREDENTIALS`. Es un secreto que no vence y termina en git o
+en un chat. En la clase 4 el pipeline hace lo mismo que la impersonación, pero
+con Workload Identity Federation.
 
 ## Pasos sin nube
 
@@ -35,8 +190,8 @@ make tf-validate
 ```
 
 Esperado: `make tf-fmt` no imprime nada, y `make tf-validate` termina cada
-carpeta con `Success! The configuration is valid.` (son 6: `envs/dev`,
-`envs/prod` y los 4 módulos).
+carpeta con `Success! The configuration is valid.` (son 7: `envs/dev`,
+`envs/prod`, `examples/nginx-vm` y los 4 módulos).
 
 `init -backend=false` **solo** sirve para `validate`: no conecta el backend,
 así que un `plan` después de eso falla con `Backend initialization required`.
@@ -50,7 +205,7 @@ Eso no es "estado local".
   instala Docker, autentica contra Artifact Registry y corre el contenedor.
 - `terraform/modules/artifact-registry/`: el repositorio `infra-cloud-template`.
 - `terraform/envs/dev/main.tf`: combina los módulos. Las variables están en
-  `variables.tf` (región `southamerica-east1` por defecto).
+  `variables.tf` (región `us-central1` por defecto).
 
 ### 3. (Opcional) Un plan sin nube, para leerlo
 
@@ -63,21 +218,21 @@ cd "$tmp/terraform/envs/dev"
 tofu init
 GOOGLE_OAUTH_ACCESS_TOKEN=falso tofu plan -refresh=false \
   -var project_id=demo \
-  -var servicio_patron_image=southamerica-east1-docker.pkg.dev/demo/infra-cloud-template/app:v1
+  -var servicio_patron_image=us-central1-docker.pkg.dev/demo/infra-cloud-template/app:v1
 cd - && rm -r "$tmp"
 ```
 
 Esperado, al final: `Plan: 8 to add, 0 to change, 0 to destroy.` (red, subred,
 3 reglas de firewall, registry, disco y VM).
 
-## Pasos en GCP
+## Pasos en GCP con el servicio patrón (desde la clase 3)
 
 > ### En la nube (dev)
 >
 > **0. Credenciales para tofu/terraform** (distintas de las de `gcloud`):
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > gcloud auth application-default login
 > gcloud auth application-default set-quota-project "$PROJECT_ID"
 > gcloud services enable compute.googleapis.com artifactregistry.googleapis.com \
@@ -115,7 +270,7 @@ Esperado, al final: `Plan: 8 to add, 0 to change, 0 to destroy.` (red, subred,
 > `curl http://<esa-IP>:8080/`. Si no contesta, mirá el script de arranque:
 >
 > ```bash
-> gcloud compute ssh infra-cloud-dev-vm --zone=southamerica-east1-a -- \
+> gcloud compute ssh infra-cloud-dev-vm --zone=us-central1-a -- \
 >   'sudo journalctl -u google-startup-scripts -e --no-pager | tail -30; sudo docker ps -a'
 > ```
 >

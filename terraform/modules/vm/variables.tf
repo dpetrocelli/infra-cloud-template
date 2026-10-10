@@ -4,7 +4,7 @@ variable "name" {
 }
 
 variable "zone" {
-  description = "GCP zone, e.g. \"southamerica-east1-a\"."
+  description = "GCP zone, e.g. \"us-central1-a\"."
   type        = string
 }
 
@@ -55,8 +55,9 @@ variable "container_name" {
 }
 
 variable "container_image" {
-  description = "Container image to run, e.g. \"southamerica-east1-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:v1\". No default: never hardcoded here."
+  description = "Container image to run, e.g. \"<region>-docker.pkg.dev/PROJECT_ID/infra-cloud-template/app:v1\". Empty = class 2: no Docker, the VM installs nginx on port 80."
   type        = string
+  default     = ""
 }
 
 variable "app_port" {
@@ -87,4 +88,10 @@ variable "data_uid" {
   description = "If > 0, chown the data disk to this uid before starting (Anvil/Foundry runs as 1000). 0 = leave it owned by root."
   type        = number
   default     = 0
+}
+
+variable "spot" {
+  description = "Spot VM: ~60-90% cheaper, but GCP can stop it at any time. Fine for dev and class demos, not for prod."
+  type        = bool
+  default     = false
 }

@@ -96,7 +96,7 @@ contador sigue: vive en el PVC.
 > **Una sola vez**:
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > export POOL_ID="github-pool"          # el pool de Workload Identity de la clase 4
 > export REPO="<usuario>/<repo>"        # tu repo, exacto
 > gcloud storage buckets create "gs://${PROJECT_ID}-tfstate" --location="$REGION"   # si no lo creaste en la clase 2
@@ -117,7 +117,7 @@ contador sigue: vive en el PVC.
 >
 > - Variable `GCP_DEPLOY_SERVICE_ACCOUNT` = `ci-deployer@<proyecto>.iam.gserviceaccount.com`
 >   (la de la clase 4 solo puede subir imágenes).
-> - Opcional: `GCP_ZONE` (default `southamerica-east1-a`).
+> - Opcional: `GCP_ZONE` (default `us-central1-a`).
 > - **Settings → Environments**: `dev` y `prod`. Un *required reviewer* ahí es
 >   la aprobación manual, pero solo existe en repos públicos o planes pagos.
 >
@@ -133,7 +133,7 @@ contador sigue: vive en el PVC.
 >    esa imagen. El primer run tarda ~15 minutos (crear el cluster). En `dev`
 >    la imagen también va a la VM de la clase 2: cambiarla **recrea la VM** (el
 >    disco de datos es otro recurso y queda).
-> 4. `gcloud container clusters get-credentials infra-cloud-dev-gke --zone southamerica-east1-a`
+> 4. `gcloud container clusters get-credentials infra-cloud-dev-gke --zone us-central1-a`
 >    y repetí los pasos 3 y 4 de arriba contra GKE (sin `-f values-k3s.yaml`).
 >
 > **Al terminar**, GKE se cobra por hora: desde `terraform/envs/dev`,

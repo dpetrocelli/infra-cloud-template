@@ -28,6 +28,16 @@ mountpoint -q "$MOUNT_POINT"
 chown -R ${data_uid}:${data_uid} "$MOUNT_POINT"
 %{ endif ~}
 
+%{ if image == "" ~}
+# Class 2: no container image yet -> the same nginx you installed by hand
+# over SSH, now done by the VM itself at boot.
+if ! command -v nginx >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y nginx
+fi
+echo "<h1>$(hostname): nginx creado con OpenTofu</h1>" > /var/www/html/index.html
+systemctl enable --now nginx
+%{ else ~}
 if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
 fi
@@ -51,3 +61,4 @@ docker run -d --name ${container_name} --restart unless-stopped \
   --entrypoint ${container_entrypoint} \
 %{ endif ~}
   ${image}%{ for a in container_args } ${a}%{ endfor }
+%{ endif ~}

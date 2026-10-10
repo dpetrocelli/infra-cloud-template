@@ -24,6 +24,8 @@ provider "google" {
 }
 
 locals {
+  # Class 2 (no image yet): nginx on 80. From class 3: the container on app_port.
+  app_port    = var.servicio_patron_image == "" ? 80 : var.app_port
   name_prefix = "infra-cloud-prod"
 }
 
@@ -32,7 +34,7 @@ module "network" {
 
   name_prefix = local.name_prefix
   region      = var.region
-  app_port    = var.app_port
+  app_port    = local.app_port
 
   app_source_ranges = var.app_source_ranges
 }
@@ -58,7 +60,8 @@ module "vm" {
   environment     = "prod"
   subnetwork_id   = module.network.subnetwork_id
   container_image = var.servicio_patron_image
-  app_port        = var.app_port
+  app_port        = local.app_port
+  spot            = var.spot
 }
 
 # GKE is on by default in prod (class 8 needs it). The VM is off by default

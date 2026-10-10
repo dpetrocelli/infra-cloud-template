@@ -6,7 +6,7 @@
 #   - the tfstate bucket gs://<GCP_PROJECT_ID>-tfstate exists;
 #   - repository variables GCP_PROJECT_ID, GCP_WORKLOAD_IDENTITY_PROVIDER and
 #     GCP_DEPLOY_SERVICE_ACCOUNT (or GCP_SERVICE_ACCOUNT); optional GCP_REGION
-#     (default southamerica-east1), GCP_ZONE (default southamerica-east1-a),
+#     (default us-central1), GCP_ZONE (default us-central1-a),
 #     AR_REPOSITORY (default infra-cloud-template);
 #   - that service account can run Terraform and talk to GKE (roles
 #     compute.admin, container.admin, artifactregistry.admin,
@@ -41,8 +41,8 @@ permissions:
 
 env:
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  REGION: ${{ vars.GCP_REGION || 'southamerica-east1' }}
-  ZONE: ${{ vars.GCP_ZONE || 'southamerica-east1-a' }}
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  ZONE: ${{ vars.GCP_ZONE || 'us-central1-a' }}
   AR_REPO: ${{ vars.AR_REPOSITORY || 'infra-cloud-template' }}
   TF_ENV: ${{ inputs.env }}
   IMAGE_TAG: ${{ inputs.image_tag }}

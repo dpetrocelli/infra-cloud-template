@@ -129,7 +129,7 @@ nuevas del chart.
 > 1. En `terraform/envs/dev/dev.tfvars` poné `enable_gke = true` y aplicá
 >    (clase 2). Son unos 10 minutos y **cuesta plata mientras existe**.
 > 2. `tofu output gke_get_credentials` te da el comando para apuntar `kubectl`
->    al cluster (`gcloud container clusters get-credentials infra-cloud-dev-gke --zone southamerica-east1-a ...`).
+>    al cluster (`gcloud container clusters get-credentials infra-cloud-dev-gke --zone us-central1-a ...`).
 >    Si pide un plugin: `gcloud components install gke-gcloud-auth-plugin`.
 > 3. Instalá con `values.yaml` (sin el `-f values-k3s.yaml`) y la imagen de la clase 3:
 >

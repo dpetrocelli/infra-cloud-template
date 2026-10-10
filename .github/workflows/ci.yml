@@ -14,7 +14,7 @@
 #   GCP_PROJECT_ID                  e.g. "mi-proyecto-123"
 #   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<NUMBER>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
 #   GCP_SERVICE_ACCOUNT             e.g. "ci-artifact-writer@mi-proyecto-123.iam.gserviceaccount.com"
-#   GCP_REGION                      optional, default southamerica-east1
+#   GCP_REGION                      optional, default us-central1
 #   AR_REPOSITORY                   optional, default infra-cloud-template
 name: ci
 
@@ -89,7 +89,7 @@ jobs:
       matrix:
         service: [app, model, pow]
     env:
-      REGION: ${{ vars.GCP_REGION || 'southamerica-east1' }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       AR_REPO: ${{ vars.AR_REPOSITORY || 'infra-cloud-template' }}
     steps:
       - uses: actions/checkout@v4
