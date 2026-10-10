@@ -138,8 +138,8 @@ Con estas variables (poné **tus** valores, entre comillas):
 
 ```bash
 export PROJECT_ID="mi-proyecto-123"        # tu proyecto de GCP, en minúsculas
-export REGION="southamerica-east1"         # la región de todo el curso
-export ZONE="southamerica-east1-a"
+export REGION="us-central1"         # la región de todo el curso
+export ZONE="us-central1-a"
 export AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/infra-cloud-template"
 echo "$AR"
 ```

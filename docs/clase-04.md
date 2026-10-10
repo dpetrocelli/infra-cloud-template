@@ -17,7 +17,7 @@ Al terminar tenés:
 ## Prerrequisitos
 
 - [ ] Tu repo creado con **Use this template** (en un fork las Actions arrancan deshabilitadas).
-- [ ] El repositorio `infra-cloud-template` de Artifact Registry de la clase 3, en `southamerica-east1`.
+- [ ] El repositorio `infra-cloud-template` de Artifact Registry de la clase 3, en `us-central1`.
 - [ ] `make doctor` sin `[FAIL]`. `gh` (GitHub CLI) es opcional: todo se puede hacer desde la web.
 
 ## Pasos
@@ -48,7 +48,7 @@ Hacé cualquier cambio chico, `git commit` y `git push`. En la pestaña
 > Reemplazá `<usuario>/<repo>` por el tuyo, **exacto** (mayúsculas incluidas).
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > export REPO="<usuario>/<repo>"
 > gcloud services enable iam.googleapis.com iamcredentials.googleapis.com \
 >   sts.googleapis.com artifactregistry.googleapis.com --project="$PROJECT_ID"
@@ -99,7 +99,7 @@ repository variable**. Son identificadores, no secretos.
 | `GCP_PROJECT_ID` | `mi-proyecto-123` | tu proyecto |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<NÚMERO>/locations/global/workloadIdentityPools/github-pool/providers/github-provider` | el `describe` del paso 3 |
 | `GCP_SERVICE_ACCOUNT` | `ci-artifact-writer@mi-proyecto-123.iam.gserviceaccount.com` | el `SA` del paso 3 |
-| `GCP_REGION` | `southamerica-east1` | opcional (es el default) |
+| `GCP_REGION` | `us-central1` | opcional (es el default) |
 | `AR_REPOSITORY` | `infra-cloud-template` | opcional (es el default) |
 
 Con `gh`: `gh variable set GCP_PROJECT_ID --body "$PROJECT_ID"` (y así con cada una).

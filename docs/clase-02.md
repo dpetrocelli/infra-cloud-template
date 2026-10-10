@@ -205,7 +205,7 @@ Eso no es "estado local".
   instala Docker, autentica contra Artifact Registry y corre el contenedor.
 - `terraform/modules/artifact-registry/`: el repositorio `infra-cloud-template`.
 - `terraform/envs/dev/main.tf`: combina los módulos. Las variables están en
-  `variables.tf` (región `southamerica-east1` por defecto).
+  `variables.tf` (región `us-central1` por defecto).
 
 ### 3. (Opcional) Un plan sin nube, para leerlo
 
@@ -218,7 +218,7 @@ cd "$tmp/terraform/envs/dev"
 tofu init
 GOOGLE_OAUTH_ACCESS_TOKEN=falso tofu plan -refresh=false \
   -var project_id=demo \
-  -var servicio_patron_image=southamerica-east1-docker.pkg.dev/demo/infra-cloud-template/app:v1
+  -var servicio_patron_image=us-central1-docker.pkg.dev/demo/infra-cloud-template/app:v1
 cd - && rm -r "$tmp"
 ```
 
@@ -232,7 +232,7 @@ Esperado, al final: `Plan: 8 to add, 0 to change, 0 to destroy.` (red, subred,
 > **0. Credenciales para tofu/terraform** (distintas de las de `gcloud`):
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > gcloud auth application-default login
 > gcloud auth application-default set-quota-project "$PROJECT_ID"
 > gcloud services enable compute.googleapis.com artifactregistry.googleapis.com \
@@ -270,7 +270,7 @@ Esperado, al final: `Plan: 8 to add, 0 to change, 0 to destroy.` (red, subred,
 > `curl http://<esa-IP>:8080/`. Si no contesta, mirá el script de arranque:
 >
 > ```bash
-> gcloud compute ssh infra-cloud-dev-vm --zone=southamerica-east1-a -- \
+> gcloud compute ssh infra-cloud-dev-vm --zone=us-central1-a -- \
 >   'sudo journalctl -u google-startup-scripts -e --no-pager | tail -30; sudo docker ps -a'
 > ```
 >

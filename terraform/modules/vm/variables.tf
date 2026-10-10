@@ -4,7 +4,7 @@ variable "name" {
 }
 
 variable "zone" {
-  description = "GCP zone, e.g. \"southamerica-east1-a\"."
+  description = "GCP zone, e.g. \"us-central1-a\"."
   type        = string
 }
 

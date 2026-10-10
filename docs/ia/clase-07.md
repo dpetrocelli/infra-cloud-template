@@ -61,7 +61,7 @@ curl -s -X POST localhost:18081/predict -H 'Content-Type: application/json' -d '
 > **Cloud Run** (lo más directo para este contenedor):
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > export AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/infra-cloud-template"
 > gcloud services enable run.googleapis.com   # una sola vez por proyecto
 > docker build --platform linux/amd64 -t "$AR/model:v1" ./model && docker push "$AR/model:v1"

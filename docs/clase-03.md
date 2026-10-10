@@ -97,12 +97,12 @@ responde 500 y en `docker logs` aparece `PermissionError`.
 > ### En la nube (Artifact Registry)
 >
 > Un solo repositorio para todo el curso: `infra-cloud-template`, en
-> `southamerica-east1`. Si aplicaste `terraform/envs/dev` en la clase 2 ya
+> `us-central1`. Si aplicaste `terraform/envs/dev` en la clase 2 ya
 > existe; si no, crealo **una sola vez** de una de estas dos formas (no las dos:
 > la segunda falla con "already exists"):
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > export AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/infra-cloud-template"
 > echo "$AR"     # revisalo: minúsculas, sin espacios, sin <...>
 > # opción A, con terraform (clase 2): ya está.
@@ -124,7 +124,7 @@ responde 500 y en `docker logs` aparece `PermissionError`.
 > de docker van con `sudo`, así que la autenticación también:
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" REGION="southamerica-east1"
+> export PROJECT_ID="mi-proyecto-123" REGION="us-central1"
 > export AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/infra-cloud-template"
 > sudo gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 > sudo docker rm -f servicio-patron 2>/dev/null

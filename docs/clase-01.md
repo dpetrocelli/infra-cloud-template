@@ -118,7 +118,7 @@ contenedor y muere con él.
 > patrón del template.
 >
 > ```bash
-> export PROJECT_ID="mi-proyecto-123" ZONE="southamerica-east1-a"
+> export PROJECT_ID="mi-proyecto-123" ZONE="us-central1-a"
 > gcloud config set project "$PROJECT_ID"
 > gcloud compute disks create servicio-patron-datos --size=10GB --type=pd-balanced --zone="$ZONE"
 > gcloud compute instances create vm-servicio-patron --zone="$ZONE" --machine-type=e2-small \
