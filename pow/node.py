@@ -114,11 +114,12 @@ def add_tx(tx: Tx) -> dict[str, Any]:
 def mine_block() -> dict[str, Any]:
     chain = load_chain()
     block = mine(new_block(chain, list(pending_tx) or [{"msg": "empty block"}]))
+    transactions_quantity = len(pending_tx) 
     pending_tx.clear()
     chain.append(block)
     save_chain(chain)
     BLOCK_HEIGHT.set(block.index)
-    return {"mined": block.to_dict()}
+    return {"mined": block.to_dict(), "transactions": transactions_quantity}
 
 
 if __name__ == "__main__":
